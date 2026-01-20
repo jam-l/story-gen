@@ -1,0 +1,386 @@
+package com.novelsim.app.presentation.editor
+
+import cafe.adriel.voyager.core.model.ScreenModel
+import cafe.adriel.voyager.core.model.screenModelScope
+import com.novelsim.app.data.model.*
+import com.novelsim.app.data.repository.StoryRepository
+import com.novelsim.app.util.PlatformUtils
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+/**
+ * 编辑器 ScreenModel
+ */
+class EditorScreenModel(
+    private val storyId: String?,
+    private val storyRepository: StoryRepository
+) : ScreenModel {
+    
+    /**
+     * 编辑器节点（包含UI状态）
+     */
+    data class EditorNode(
+        val node: StoryNode,
+        val isSelected: Boolean = false
+    )
+    
+    /**
+     * UI 状态
+     */
+    data class UiState(
+        val isLoading: Boolean = true,
+        val story: Story? = null,
+        val nodes: List<EditorNode> = emptyList(),
+        val selectedNode: StoryNode? = null,
+        val showNodeEditor: Boolean = false,
+        val showAddNodeMenu: Boolean = false,
+        val canvasScale: Float = 1f,
+        val canvasOffsetX: Float = 0f,
+        val canvasOffsetY: Float = 0f,
+        val error: String? = null,
+        val isSaving: Boolean = false,
+        val storyTitle: String = "新故事",
+        val storyDescription: String = "",
+        val isListMode: Boolean = false // 是否为列表模式
+    )
+    
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    
+    private val json = Json { 
+        prettyPrint = true 
+        ignoreUnknownKeys = true
+    }
+    
+    init {
+        if (storyId != null) {
+            loadStory()
+        } else {
+            createNewStory()
+        }
+    }
+    
+    /**
+     * 加载现有故事
+     */
+    private fun loadStory() {
+        screenModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            val story = storyRepository.getStoryById(storyId!!)
+            if (story != null) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    story = story,
+                    storyTitle = story.title,
+                    storyDescription = story.description,
+                    nodes = story.nodes.values.map { EditorNode(it) }
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "故事不存在"
+                )
+            }
+        }
+    }
+    
+    /**
+     * 创建新故事
+     */
+    private fun createNewStory() {
+        val startNode = StoryNode(
+            id = "start",
+            type = NodeType.DIALOGUE,
+            content = NodeContent.Dialogue(
+                speaker = "旁白",
+                text = "故事开始..."
+            ),
+            position = NodePosition(200f, 200f)
+        )
+        
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            nodes = listOf(EditorNode(startNode))
+        )
+        
+        // 自动保存初始状态
+        saveStory()
+    }
+    
+    /**
+     * 添加新节点
+     */
+    fun addNode(type: NodeType, x: Float, y: Float) {
+        val nodeId = "node_${PlatformUtils.getCurrentTimeMillis()}"
+        
+        val content: NodeContent = when (type) {
+            NodeType.DIALOGUE -> NodeContent.Dialogue(text = "新对话内容")
+            NodeType.CHOICE -> NodeContent.Choice(
+                prompt = "请选择",
+                options = listOf(
+                    ChoiceOption(
+                        id = "opt_1",
+                        text = "选项1",
+                        nextNodeId = ""
+                    )
+                )
+            )
+            NodeType.CONDITION -> NodeContent.Condition(
+                expression = "variable > 0",
+                trueNextNodeId = "",
+                falseNextNodeId = ""
+            )
+            NodeType.BATTLE -> NodeContent.Battle(
+                enemyId = "",
+                winNextNodeId = "",
+                loseNextNodeId = ""
+            )
+            NodeType.ITEM -> NodeContent.ItemAction(
+                itemId = "",
+                quantity = 1,
+                action = ItemActionType.GIVE,
+                nextNodeId = ""
+            )
+            NodeType.VARIABLE -> NodeContent.VariableAction(
+                variableName = "variable",
+                operation = VariableOperation.SET,
+                value = "0",
+                nextNodeId = ""
+            )
+            NodeType.END -> NodeContent.Ending(
+                title = "结局",
+                description = "故事结束"
+            )
+        }
+        
+        val newNode = StoryNode(
+            id = nodeId,
+            type = type,
+            content = content,
+            position = NodePosition(x, y)
+        )
+        
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes + EditorNode(newNode),
+            showAddNodeMenu = false
+        )
+    }
+    
+    /**
+     * 删除节点
+     */
+    fun deleteNode(nodeId: String) {
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes.filter { it.node.id != nodeId },
+            selectedNode = if (_uiState.value.selectedNode?.id == nodeId) null else _uiState.value.selectedNode,
+            showNodeEditor = if (_uiState.value.selectedNode?.id == nodeId) false else _uiState.value.showNodeEditor
+        )
+    }
+    
+    /**
+     * 选择节点
+     */
+    fun selectNode(nodeId: String?) {
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes.map { 
+                it.copy(isSelected = it.node.id == nodeId) 
+            },
+            selectedNode = _uiState.value.nodes.find { it.node.id == nodeId }?.node,
+            showNodeEditor = nodeId != null
+        )
+    }
+    
+    /**
+     * 移动节点
+     */
+    fun moveNode(nodeId: String, newX: Float, newY: Float) {
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes.map { editorNode ->
+                if (editorNode.node.id == nodeId) {
+                    editorNode.copy(
+                        node = editorNode.node.copy(
+                            position = NodePosition(newX, newY)
+                        )
+                    )
+                } else {
+                    editorNode
+                }
+            }
+        )
+    }
+    
+    /**
+     * 更新节点内容
+     */
+    fun updateNodeContent(nodeId: String, content: NodeContent) {
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes.map { editorNode ->
+                if (editorNode.node.id == nodeId) {
+                    val updatedNode = editorNode.node.copy(content = content)
+                    editorNode.copy(node = updatedNode)
+                } else {
+                    editorNode
+                }
+            }
+        )
+        // 更新选中节点
+        _uiState.value.selectedNode?.let { selected ->
+            if (selected.id == nodeId) {
+                _uiState.value = _uiState.value.copy(
+                    selectedNode = _uiState.value.nodes.find { it.node.id == nodeId }?.node
+                )
+            }
+        }
+    }
+    
+    /**
+     * 添加连接
+     */
+    fun addConnection(fromNodeId: String, toNodeId: String, label: String? = null) {
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes.map { editorNode ->
+                if (editorNode.node.id == fromNodeId) {
+                    val newConnections = editorNode.node.connections + Connection(toNodeId, label)
+                    editorNode.copy(node = editorNode.node.copy(connections = newConnections))
+                } else {
+                    editorNode
+                }
+            }
+        )
+    }
+    
+    /**
+     * 移除连接
+     */
+    fun removeConnection(fromNodeId: String, toNodeId: String) {
+        _uiState.value = _uiState.value.copy(
+            nodes = _uiState.value.nodes.map { editorNode ->
+                if (editorNode.node.id == fromNodeId) {
+                    val newConnections = editorNode.node.connections.filter { it.targetNodeId != toNodeId }
+                    editorNode.copy(node = editorNode.node.copy(connections = newConnections))
+                } else {
+                    editorNode
+                }
+            }
+        )
+    }
+    
+    /**
+     * 更新画布缩放
+     */
+    fun updateCanvasScale(scale: Float) {
+        _uiState.value = _uiState.value.copy(
+            canvasScale = scale.coerceIn(0.3f, 3f)
+        )
+    }
+    
+    /**
+     * 更新画布偏移
+     */
+    fun updateCanvasOffset(offsetX: Float, offsetY: Float) {
+        _uiState.value = _uiState.value.copy(
+            canvasOffsetX = offsetX,
+            canvasOffsetY = offsetY
+        )
+    }
+    
+    /**
+     * 更新故事标题
+     */
+    fun updateStoryTitle(title: String) {
+        _uiState.value = _uiState.value.copy(storyTitle = title)
+    }
+    
+    /**
+     * 更新故事描述
+     */
+    fun updateStoryDescription(description: String) {
+        _uiState.value = _uiState.value.copy(storyDescription = description)
+    }
+    
+    /**
+     * 显示/隐藏添加节点菜单
+     */
+    fun toggleAddNodeMenu() {
+        _uiState.value = _uiState.value.copy(
+            showAddNodeMenu = !_uiState.value.showAddNodeMenu
+        )
+    }
+    
+    /**
+     * 切换视图模式
+     */
+    fun toggleViewMode() {
+        _uiState.update { state ->
+            state.copy(isListMode = !state.isListMode)
+        }
+    }
+
+    /**
+     * 关闭节点编辑器
+     */
+    fun closeNodeEditor() {
+        _uiState.value = _uiState.value.copy(
+            showNodeEditor = false,
+            selectedNode = null,
+            nodes = _uiState.value.nodes.map { it.copy(isSelected = false) }
+        )
+    }
+    
+    /**
+     * 保存故事
+     */
+    fun saveStory() {
+        screenModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true)
+            
+            val nodesMap = _uiState.value.nodes.associate { it.node.id to it.node }
+            val startNodeId = _uiState.value.nodes.firstOrNull()?.node?.id ?: "start"
+            
+            val story = Story(
+                id = storyId ?: "story_${PlatformUtils.getCurrentTimeMillis()}",
+                title = _uiState.value.storyTitle,
+                author = "用户",
+                description = _uiState.value.storyDescription,
+                startNodeId = startNodeId,
+                nodes = nodesMap,
+                createdAt = _uiState.value.story?.createdAt ?: PlatformUtils.getCurrentTimeMillis(),
+                updatedAt = PlatformUtils.getCurrentTimeMillis()
+            )
+            
+            storyRepository.saveStory(story)
+            
+            _uiState.value = _uiState.value.copy(
+                isSaving = false,
+                story = story
+            )
+        }
+    }
+    
+    /**
+     * 导出为 JSON
+     */
+    fun exportToJson(): String {
+        val nodesMap = _uiState.value.nodes.associate { it.node.id to it.node }
+        val startNodeId = _uiState.value.nodes.firstOrNull()?.node?.id ?: "start"
+        
+        val story = Story(
+            id = storyId ?: "story_${PlatformUtils.getCurrentTimeMillis()}",
+            title = _uiState.value.storyTitle,
+            author = "用户",
+            description = _uiState.value.storyDescription,
+            startNodeId = startNodeId,
+            nodes = nodesMap,
+            createdAt = PlatformUtils.getCurrentTimeMillis(),
+            updatedAt = PlatformUtils.getCurrentTimeMillis()
+        )
+        
+        return json.encodeToString(story)
+    }
+}

@@ -1,0 +1,40 @@
+-- SaveData table: stores game saves
+CREATE TABLE SaveData (
+    id TEXT NOT NULL PRIMARY KEY,
+    slotIndex INTEGER NOT NULL,
+    storyId TEXT NOT NULL,
+    storyTitle TEXT NOT NULL,
+    gameStateJson TEXT NOT NULL,  -- JSON serialized game state
+    timestamp INTEGER NOT NULL,
+    playTime INTEGER NOT NULL,
+    currentNodePreview TEXT
+);
+
+-- Get all saves
+getAllSaves:
+SELECT * FROM SaveData ORDER BY timestamp DESC;
+
+-- Get save by ID
+getSaveById:
+SELECT * FROM SaveData WHERE id = ?;
+
+-- Get save by slot index
+getSaveBySlot:
+SELECT * FROM SaveData WHERE slotIndex = ?;
+
+-- Get saves for story
+getSavesForStory:
+SELECT * FROM SaveData WHERE storyId = ? ORDER BY timestamp DESC;
+
+-- Insert or replace save
+insertSave:
+INSERT OR REPLACE INTO SaveData(id, slotIndex, storyId, storyTitle, gameStateJson, timestamp, playTime, currentNodePreview)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Delete save
+deleteSave:
+DELETE FROM SaveData WHERE id = ?;
+
+-- Delete save by slot
+deleteSaveBySlot:
+DELETE FROM SaveData WHERE slotIndex = ?;

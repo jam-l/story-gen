@@ -1,0 +1,49 @@
+-- StoryNode table: stores individual story nodes
+CREATE TABLE StoryNode (
+    id TEXT NOT NULL,
+    storyId TEXT NOT NULL,
+    type TEXT NOT NULL,
+    contentJson TEXT NOT NULL,
+    positionX REAL NOT NULL DEFAULT 0,
+    positionY REAL NOT NULL DEFAULT 0,
+    connectionsJson TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (id, storyId),
+    FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+-- Get all nodes for a story
+getNodesForStory:
+SELECT * FROM StoryNode WHERE storyId = ?;
+
+-- Get single node
+getNodeById:
+SELECT * FROM StoryNode WHERE id = ? AND storyId = ?;
+
+-- Insert or replace node
+insertNode:
+INSERT OR REPLACE INTO StoryNode(id, storyId, type, contentJson, positionX, positionY, connectionsJson)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- Update node content only
+updateNodeContent:
+UPDATE StoryNode SET contentJson = ? WHERE id = ? AND storyId = ?;
+
+-- Update node position only (for drag operations)
+updateNodePosition:
+UPDATE StoryNode SET positionX = ?, positionY = ? WHERE id = ? AND storyId = ?;
+
+-- Update node connections only
+updateNodeConnections:
+UPDATE StoryNode SET connectionsJson = ? WHERE id = ? AND storyId = ?;
+
+-- Delete single node
+deleteNode:
+DELETE FROM StoryNode WHERE id = ? AND storyId = ?;
+
+-- Delete all nodes for a story
+deleteNodesForStory:
+DELETE FROM StoryNode WHERE storyId = ?;
+
+-- Count nodes for a story
+countNodesForStory:
+SELECT COUNT(*) FROM StoryNode WHERE storyId = ?;

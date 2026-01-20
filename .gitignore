@@ -1,0 +1,49 @@
+# Gradle files
+.gradle/
+.kotlin/
+build/
+*/build/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# Android
+capture/
+local.properties
+.externalNativeBuild
+.cxx
+*.apk
+*.aar
+*.ap_
+
+# iOS/Xcode
+*.xcuserstate
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.app
+*.framework
+*.dSYM
+*.xcplugindata
+
+# macOS
+.DS_Store
+
+# SQLDelight
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# User sensitive data
+secrets.xml
+google-services.json
+GoogleService-Info.plist
