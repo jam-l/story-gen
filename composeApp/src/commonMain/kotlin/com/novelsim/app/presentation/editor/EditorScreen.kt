@@ -36,6 +36,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.novelsim.app.data.model.*
 import com.novelsim.app.presentation.editor.components.*
+import com.novelsim.app.presentation.editor.database.DatabaseEditor
 import org.koin.core.parameter.parametersOf
 import kotlin.math.roundToInt
 import com.novelsim.app.util.PlatformUtils
@@ -69,7 +70,8 @@ data class EditorScreen(
                         println(json)
                     },
                     onTitleChange = { screenModel.updateStoryTitle(it) },
-                    onToggleViewMode = { screenModel.toggleViewMode() }
+                    onToggleViewMode = { screenModel.toggleViewMode() },
+                    onOpenDatabase = { screenModel.toggleDatabaseEditor(true) }
                 )
             },
             floatingActionButton = {
@@ -143,6 +145,11 @@ data class EditorScreen(
                                 NodeEditorPanel(
                                     node = node,
                                     allNodes = uiState.nodes,
+                                    characters = uiState.characters,
+                                    clues = uiState.clues,
+                                    factions = uiState.factions,
+                                    locations = uiState.locations,
+                                    events = uiState.events,
                                     onContentChange = { screenModel.updateNodeContent(node.id, it) },
                                     onDelete = { screenModel.deleteNode(node.id) },
                                     onClose = { screenModel.closeNodeEditor() }
@@ -152,6 +159,14 @@ data class EditorScreen(
                     }
                 }
             }
+        }
+        
+        // 数据库编辑器模态窗口
+        if (uiState.showDatabaseEditor) {
+            DatabaseEditor(
+                onDismissRequest = { screenModel.toggleDatabaseEditor(false) },
+                screenModel = screenModel
+            )
         }
     }
 }
@@ -166,7 +181,8 @@ private fun EditorTopBar(
     onSave: () -> Unit,
     onExport: () -> Unit,
     onTitleChange: (String) -> Unit,
-    onToggleViewMode: () -> Unit
+    onToggleViewMode: () -> Unit,
+    onOpenDatabase: () -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var editedTitle by remember(title) { mutableStateOf(title) }
@@ -209,6 +225,11 @@ private fun EditorTopBar(
             }
         },
         actions = {
+            // 数据库管理按钮
+            IconButton(onClick = onOpenDatabase) {
+                Icon(Icons.Default.Settings, contentDescription = "数据库管理")
+            }
+            
             // 视图切换按钮
             IconButton(onClick = onToggleViewMode) {
                 Icon(
@@ -259,7 +280,7 @@ private fun NodeEditorCanvas(
     val currentOffsetX by rememberUpdatedState(offsetX)
     val currentOffsetY by rememberUpdatedState(offsetY)
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
@@ -275,6 +296,18 @@ private fun NodeEditorCanvas(
                 )
             }
     ) {
+        val viewportWidth = constraints.maxWidth
+        val viewportHeight = constraints.maxHeight
+        
+        // Culling: Calculate visible nodes
+        // Node width is roughly 160.dp * scale. Let's use a safe margin.
+        val nodeWidthPx = 160 * scale * 3 // explicit density conversion omitted for simplicity, using rough factor
+        val nodeHeightPx = 200 * scale * 3 
+        // 3 is usually density approx on high DPI screens, but accessing local density is better.
+        // However, constraints are in pixels. dp to px requires LocalDensity.
+        
+        // Let's iterate all nodes for Canvas, but filter for Composable
+        
         Canvas(modifier = Modifier.fillMaxSize()) {
             val gridSize = 50f * scale
             val startX = (offsetX % gridSize)
@@ -315,35 +348,65 @@ private fun NodeEditorCanvas(
                         val toX = toNode.position.x * scale + offsetX
                         val toY = toNode.position.y * scale + offsetY + 40f * scale
                         
-                        val path = Path().apply {
-                            moveTo(fromX, fromY)
-                            val controlX1 = fromX + 50f * scale
-                            val controlX2 = toX - 50f * scale
-                            cubicTo(controlX1, fromY, controlX2, toY, toX, toY)
+                        // Simple culling for connection lines:
+                        // Only draw if at least one point is somewhat near the viewport
+                        // or just rely on Skia clipping which is fast.
+                        // Given complexity of Bezier, let's keep drawing all for now,
+                        // or just simple bounding box check of the two points.
+                        
+                        val minX = minOf(fromX, toX)
+                        val maxX = maxOf(fromX, toX)
+                        val minY = minOf(fromY, toY)
+                        val maxY = maxOf(fromY, toY)
+                        
+                        if (maxX >= 0 && minX <= size.width && maxY >= 0 && minY <= size.height) {
+                             val path = Path().apply {
+                                moveTo(fromX, fromY)
+                                val controlX1 = fromX + 50f * scale
+                                val controlX2 = toX - 50f * scale
+                                cubicTo(controlX1, fromY, controlX2, toY, toX, toY)
+                            }
+                            
+                            drawPath(
+                                path = path,
+                                color = Color(0xFF5C6BC0),
+                                style = Stroke(width = 2f * scale)
+                            )
+                            
+                            val arrowSize = 8f * scale
+                            drawPath(
+                                path = Path().apply {
+                                    moveTo(toX, toY)
+                                    lineTo(toX - arrowSize, toY - arrowSize / 2)
+                                    lineTo(toX - arrowSize, toY + arrowSize / 2)
+                                    close()
+                                },
+                                color = Color(0xFF5C6BC0)
+                            )
                         }
-                        
-                        drawPath(
-                            path = path,
-                            color = Color(0xFF5C6BC0),
-                            style = Stroke(width = 2f * scale)
-                        )
-                        
-                        val arrowSize = 8f * scale
-                        drawPath(
-                            path = Path().apply {
-                                moveTo(toX, toY)
-                                lineTo(toX - arrowSize, toY - arrowSize / 2)
-                                lineTo(toX - arrowSize, toY + arrowSize / 2)
-                                close()
-                            },
-                            color = Color(0xFF5C6BC0)
-                        )
                     }
                 }
             }
         }
         
-        nodes.forEach { editorNode ->
+        val density = androidx.compose.ui.platform.LocalDensity.current.density
+        // Optimization: Filter nodes to only render those within the viewport
+        val visibleNodes = remember(nodes, scale, offsetX, offsetY, viewportWidth, viewportHeight) {
+            nodes.filter { editorNode ->
+                val node = editorNode.node
+                val nodeX = node.position.x * scale + offsetX
+                val nodeY = node.position.y * scale + offsetY
+                
+                // Approx node size in px
+                val w = 180 * scale * density // 160 + padding/border
+                val h = 100 * scale * density // Min height approx
+                
+                // Check intersection with viewport [0, 0, viewportWidth, viewportHeight]
+                nodeX + w > 0 && nodeX < viewportWidth && nodeY + h > 0 && nodeY < viewportHeight
+            }
+        }
+
+        visibleNodes.forEach { editorNode ->
             val node = editorNode.node
             val nodeX = (node.position.x * scale + offsetX).roundToInt()
             val nodeY = (node.position.y * scale + offsetY).roundToInt()
@@ -381,42 +444,38 @@ private fun DraggableNodeCard(
     onMove: (Float, Float) -> Unit,
     onClick: () -> Unit
 ) {
-    // 使用当前显示的绝对像素位置作为状态，以 offsetX/Y (来自模型) 为基准
-    // 当模型更新时，key 变化，状态会自动更新为新模型位置
-    var currentX by remember(offsetX) { mutableStateOf(offsetX.toFloat()) }
-    var currentY by remember(offsetY) { mutableStateOf(offsetY.toFloat()) }
+    // 使用相对位移状态，避免与外部 offsetX/Y 状态同步的问题
+    var dragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var isDragging by remember { mutableStateOf(false) }
+    
+    val currentOnMove by rememberUpdatedState(onMove)
+    val currentOnClick by rememberUpdatedState(onClick)
     
     Box(
         modifier = Modifier
             .offset { 
                 IntOffset(
-                    currentX.roundToInt(), 
-                    currentY.roundToInt()
+                    (offsetX + dragOffset.x).roundToInt(), 
+                    (offsetY + dragOffset.y).roundToInt()
                 ) 
             }
-            .pointerInput(node.id) {
+            .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { isDragging = true },
                     onDragEnd = { 
                         isDragging = false
-                        // 计算相对于原始位置的偏移量，传回给 modify
-                        val dx = currentX - offsetX
-                        val dy = currentY - offsetY
-                        if (dx != 0f || dy != 0f) {
-                            onMove(dx, dy)
+                        if (dragOffset != androidx.compose.ui.geometry.Offset.Zero) {
+                            currentOnMove(dragOffset.x, dragOffset.y)
+                            dragOffset = androidx.compose.ui.geometry.Offset.Zero
                         }
                     },
                     onDragCancel = {
                         isDragging = false
-                        // 取消时回弹到模型位置
-                        currentX = offsetX.toFloat()
-                        currentY = offsetY.toFloat()
+                        dragOffset = androidx.compose.ui.geometry.Offset.Zero
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        currentX += dragAmount.x
-                        currentY += dragAmount.y
+                        dragOffset += dragAmount
                     }
                 )
             }
@@ -425,7 +484,7 @@ private fun DraggableNodeCard(
             node = node,
             isSelected = isSelected || isDragging,
             scale = scale,
-            onClick = onClick
+            onClick = currentOnClick
         )
     }
 }
@@ -630,6 +689,11 @@ private fun NodeTypeButton(
 private fun NodeEditorPanel(
     node: StoryNode,
     allNodes: List<EditorScreenModel.EditorNode>,
+    characters: List<Character>,
+    clues: List<Clue>,
+    factions: List<Faction>,
+    locations: List<Location> = emptyList(),
+    events: List<GameEvent> = emptyList(),
     onContentChange: (NodeContent) -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit
@@ -690,10 +754,18 @@ private fun NodeEditorPanel(
                 item {
                     when (val content = node.content) {
                         is NodeContent.Dialogue -> {
-                            DialogueEditor(content, onContentChange)
+                            DialogueEditor(content, characters, onContentChange)
                         }
                         is NodeContent.Choice -> {
-                            ChoiceEditor(content, onContentChange)
+                            ChoiceEditor(
+                                content = content,
+                                clues = clues,
+                                factions = factions,
+                                characters = characters,
+                                locations = locations,
+                                events = events,
+                                onContentChange = onContentChange
+                            )
                         }
                         is NodeContent.Ending -> {
                             EndingEditor(content, onContentChange)
@@ -702,6 +774,10 @@ private fun NodeEditorPanel(
                             ConditionEditor(
                                 content = content,
                                 availableNodes = allNodes.map { it.node },
+                                clues = clues,
+                                factions = factions,
+                                characters = characters,
+                                locations = locations,
                                 onContentChange = onContentChange
                             )
                         }
@@ -759,22 +835,59 @@ private fun NodeEditorPanel(
 @Composable
 private fun DialogueEditor(
     content: NodeContent.Dialogue,
+    characters: List<Character>,
     onContentChange: (NodeContent) -> Unit
 ) {
     var speaker by remember(content) { mutableStateOf(content.speaker ?: "") }
     var text by remember(content) { mutableStateOf(content.text) }
+    var expanded by remember { mutableStateOf(false) }
     
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = speaker,
-            onValueChange = { 
-                speaker = it
-                onContentChange(content.copy(speaker = it.ifEmpty { null }))
-            },
-            label = { Text("说话者") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = speaker,
+                onValueChange = { 
+                    speaker = it
+                    onContentChange(content.copy(speaker = it.ifEmpty { null }))
+                },
+                label = { Text("说话者") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "选择角色")
+                    }
+                }
+            )
+            
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.7f) // Adjust width as needed
+            ) {
+                DropdownMenuItem(
+                    text = { Text("旁白") },
+                    onClick = {
+                        speaker = "旁白"
+                        expanded = false
+                        onContentChange(content.copy(speaker = "旁白"))
+                    }
+                )
+                characters.forEach { character ->
+                    DropdownMenuItem(
+                        text = { Text(character.name) },
+                        onClick = {
+                            speaker = character.name
+                            expanded = false
+                            onContentChange(content.copy(
+                                speaker = character.name,
+                                portrait = character.avatar // Auto-fill avatar if available
+                            ))
+                        }
+                    )
+                }
+            }
+        }
         
         OutlinedTextField(
             value = text,
@@ -793,6 +906,11 @@ private fun DialogueEditor(
 @Composable
 private fun ChoiceEditor(
     content: NodeContent.Choice,
+    clues: List<Clue>,
+    factions: List<Faction>,
+    characters: List<Character>,
+    locations: List<Location>,
+    events: List<GameEvent> = emptyList(),
     onContentChange: (NodeContent) -> Unit
 ) {
     var prompt by remember(content) { mutableStateOf(content.prompt) }
@@ -837,6 +955,22 @@ private fun ChoiceEditor(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+                    
+                    if (optionText.isNotEmpty()) {
+                        EffectsListEditor(
+                            effects = option.effects,
+                            clues = clues,
+                            factions = factions,
+                            characters = characters,
+                            locations = locations,
+                            events = events,
+                            onEffectsChange = { newEffects ->
+                                val newOptions = content.options.toMutableList()
+                                newOptions[index] = option.copy(effects = newEffects)
+                                onContentChange(content.copy(options = newOptions))
+                            }
+                        )
+                    }
                 }
             }
         }

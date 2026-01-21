@@ -182,6 +182,33 @@ sealed class Effect {
     data class PlaySound(
         val soundId: String
     ) : Effect()
+
+    @Serializable
+    data class AddClue(
+        val clueId: String
+    ) : Effect()
+
+    @Serializable
+    data class ModifyReputation(
+        val factionId: String,
+        val amount: Int
+    ) : Effect()
+
+    @Serializable
+    data class ModifyRelationship(
+        val characterId: String,
+        val amount: Int
+    ) : Effect()
+
+    @Serializable
+    data class MoveToLocation(
+        val locationId: String
+    ) : Effect()
+
+    @Serializable
+    data class TriggerEvent(
+        val eventId: String
+    ) : Effect()
 }
 
 /**
@@ -232,3 +259,82 @@ data class Story(
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )
+
+/**
+ * 角色 - 故事中的登场人物
+ */
+@Serializable
+data class Character(
+    val id: String,
+    val name: String,
+    val description: String,
+    val avatar: String? = null,
+    val baseStats: CharacterStats = CharacterStats(),
+    val factionId: String? = null,
+    val relationships: Map<String, Int> = emptyMap(),
+    val tags: List<String> = emptyList()
+)
+
+/**
+ * 地点 - 角色活动的场所
+ */
+@Serializable
+data class Location(
+    val id: String,
+    val name: String,
+    val description: String,
+    val background: String? = null,
+    val connectedLocationIds: List<String> = emptyList(),
+    val npcs: List<String> = emptyList(),
+    val events: List<String> = emptyList()
+)
+
+/**
+ * 游戏事件 - 宏观剧情单元
+ */
+@Serializable
+data class GameEvent(
+    val id: String,
+    val name: String,
+    val description: String,
+    val startNodeId: String,
+    val triggerCondition: String? = null,
+    val priority: Int = 0,
+    val isRepeatable: Boolean = false
+)
+
+/**
+ * 线索 - 推理系统的核心元素
+ */
+@Serializable
+data class Clue(
+    val id: String,
+    val name: String,
+    val description: String,
+    val isKnown: Boolean = false
+)
+
+/**
+ * 阵营 - 势力和声望系统
+ */
+@Serializable
+data class Faction(
+    val id: String,
+    val name: String,
+    val description: String,
+    val reputation: Int = 0
+)
+
+/**
+ * 故事数据包 - 用于导入导出完整故事数据
+ */
+@Serializable
+data class StoryPackage(
+    val story: Story,
+    val characters: List<Character> = emptyList(),
+    val locations: List<Location> = emptyList(),
+    val events: List<GameEvent> = emptyList(),
+    val clues: List<Clue> = emptyList(),
+    val factions: List<Faction> = emptyList()
+)
+

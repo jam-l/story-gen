@@ -1,0 +1,25 @@
+
+CREATE TABLE Clue (
+    id TEXT NOT NULL PRIMARY KEY,
+    storyId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    isKnown INTEGER NOT NULL DEFAULT 0, -- 0: false, 1: true
+    FOREIGN KEY(storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+getCluesForStory:
+SELECT * FROM Clue WHERE storyId = ?;
+
+getClueById:
+SELECT * FROM Clue WHERE id = ?;
+
+insertClue:
+INSERT OR REPLACE INTO Clue(id, storyId, name, description, isKnown)
+VALUES (?, ?, ?, ?, ?);
+
+deleteClue:
+DELETE FROM Clue WHERE id = ? AND storyId = ?;
+
+deleteCluesForStory:
+DELETE FROM Clue WHERE storyId = ?;

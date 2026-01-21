@@ -1,6 +1,6 @@
 package com.novelsim.app.data.repository
 
-import com.novelsim.app.data.model.Story
+import com.novelsim.app.data.model.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -18,19 +18,41 @@ object StoryExporter {
     /**
      * 将故事导出为 JSON 字符串
      */
-    fun exportToJson(story: Story): String {
-        return json.encodeToString(story)
+    fun exportToJson(
+        story: Story,
+        characters: List<Character> = emptyList(),
+        locations: List<Location> = emptyList(),
+        events: List<GameEvent> = emptyList(),
+        clues: List<Clue> = emptyList(),
+        factions: List<Faction> = emptyList()
+    ): String {
+        val pkg = StoryPackage(
+            story = story,
+            characters = characters,
+            locations = locations,
+            events = events,
+            clues = clues,
+            factions = factions
+        )
+        return json.encodeToString(pkg)
     }
     
     /**
      * 从 JSON 字符串导入故事
      */
-    fun importFromJson(jsonString: String): Result<Story> {
+    fun importFromJson(jsonString: String): Result<StoryPackage> {
         return try {
-            val story = json.decodeFromString<Story>(jsonString)
-            Result.success(story)
+            // 尝试作为 StoryPackage 解析
+            val pkg = json.decodeFromString<StoryPackage>(jsonString)
+            Result.success(pkg)
         } catch (e: Exception) {
-            Result.failure(Exception("导入失败: ${e.message}"))
+            try {
+                // 向后兼容：尝试作为旧版 Story 解析
+                val story = json.decodeFromString<Story>(jsonString)
+                Result.success(StoryPackage(story))
+            } catch (e2: Exception) {
+                Result.failure(Exception("导入失败: ${e.message}"))
+            }
         }
     }
     

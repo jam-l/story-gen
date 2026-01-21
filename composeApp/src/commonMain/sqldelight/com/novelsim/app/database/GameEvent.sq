@@ -1,0 +1,34 @@
+-- Event table: stores game event definitions
+CREATE TABLE GameEvent (
+    id TEXT NOT NULL,
+    storyId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    startNodeId TEXT NOT NULL,
+    triggerCondition TEXT, -- Expression string
+    priority INTEGER NOT NULL DEFAULT 0,
+    isRepeatable INTEGER NOT NULL DEFAULT 0, -- Boolean: 0 = false, 1 = true
+    PRIMARY KEY (id, storyId),
+    FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+-- Get all events for a story
+getEventsForStory:
+SELECT * FROM GameEvent WHERE storyId = ? ORDER BY priority DESC;
+
+-- Get single event
+getEventById:
+SELECT * FROM GameEvent WHERE id = ? AND storyId = ?;
+
+-- Insert or replace event
+insertEvent:
+INSERT OR REPLACE INTO GameEvent(id, storyId, name, description, startNodeId, triggerCondition, priority, isRepeatable)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Delete event
+deleteEvent:
+DELETE FROM GameEvent WHERE id = ? AND storyId = ?;
+
+-- Delete all events for a story
+deleteEventsForStory:
+DELETE FROM GameEvent WHERE storyId = ?;

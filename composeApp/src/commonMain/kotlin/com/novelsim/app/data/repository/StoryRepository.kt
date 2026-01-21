@@ -24,6 +24,12 @@ class StoryRepository(
     private val database = NovelSimulatorDatabase(databaseDriverFactory.createDriver())
     private val storyQueries = database.storyQueries
     private val nodeQueries = database.storyNodeQueries
+    private val characterQueries = database.characterQueries
+    private val locationQueries = database.locationQueries
+    private val eventQueries = database.gameEventQueries
+    private val clueQueries = database.clueQueries
+    private val factionQueries = database.factionQueries
+
     
     private val json = Json { 
         ignoreUnknownKeys = true 
@@ -210,10 +216,243 @@ class StoryRepository(
             connections = nodeConnections
         )
     }
-    
+
+    // ============================================================================================
+    // 角色管理方法
+    // ============================================================================================
+
     /**
-     * 创建示例故事
+     * 获取故事的所有角色
      */
+    suspend fun getCharacters(storyId: String): List<Character> {
+        return characterQueries.getCharactersForStory(storyId).executeAsList().map { it.toCharacter() }
+    }
+
+    /**
+     * 保存角色
+     */
+    suspend fun saveCharacter(character: Character, storyId: String) {
+        characterQueries.insertCharacter(
+            id = character.id,
+            storyId = storyId,
+            name = character.name,
+            description = character.description,
+            avatar = character.avatar,
+            baseStatsJson = json.encodeToString(character.baseStats),
+            factionId = character.factionId,
+            relationshipsJson = json.encodeToString(character.relationships),
+            tagsJson = json.encodeToString(character.tags)
+        )
+    }
+
+    /**
+     * 删除角色
+     */
+    suspend fun deleteCharacter(characterId: String, storyId: String) {
+        characterQueries.deleteCharacter(characterId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Character.toCharacter(): Character {
+        return Character(
+            id = id,
+            name = name,
+            description = description,
+            avatar = avatar,
+            baseStats = try { json.decodeFromString(baseStatsJson) } catch (e: Exception) { CharacterStats() },
+            factionId = factionId,
+            relationships = try { json.decodeFromString(relationshipsJson) } catch (e: Exception) { emptyMap() },
+            tags = try { json.decodeFromString(tagsJson) } catch (e: Exception) { emptyList() }
+        )
+    }
+    
+    // ============================================================================================
+    // 地点管理方法
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有地点
+     */
+    suspend fun getLocations(storyId: String): List<Location> {
+        return locationQueries.getLocationsForStory(storyId).executeAsList().map { it.toLocation() }
+    }
+
+    /**
+     * 保存地点
+     */
+    suspend fun saveLocation(location: Location, storyId: String) {
+        locationQueries.insertLocation(
+            id = location.id,
+            storyId = storyId,
+            name = location.name,
+            description = location.description,
+            background = location.background,
+            connectedLocationIdsJson = json.encodeToString(location.connectedLocationIds),
+            npcsJson = json.encodeToString(location.npcs),
+            eventsJson = json.encodeToString(location.events)
+        )
+    }
+
+    /**
+     * 删除地点
+     */
+    suspend fun deleteLocation(locationId: String, storyId: String) {
+        locationQueries.deleteLocation(locationId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Location.toLocation(): Location {
+        return Location(
+            id = id,
+            name = name,
+            description = description,
+            background = background,
+            connectedLocationIds = try { json.decodeFromString(connectedLocationIdsJson) } catch (e: Exception) { emptyList() },
+            npcs = try { json.decodeFromString(npcsJson) } catch (e: Exception) { emptyList() },
+            events = try { json.decodeFromString(eventsJson) } catch (e: Exception) { emptyList() }
+        )
+    }
+    
+    // ============================================================================================
+    // 事件管理方法
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有事件
+     */
+    suspend fun getEvents(storyId: String): List<GameEvent> {
+        return eventQueries.getEventsForStory(storyId).executeAsList().map { it.toGameEvent() }
+    }
+
+    /**
+     * 保存事件
+     */
+    suspend fun saveEvent(event: GameEvent, storyId: String) {
+        eventQueries.insertEvent(
+            id = event.id,
+            storyId = storyId,
+            name = event.name,
+            description = event.description,
+            startNodeId = event.startNodeId,
+            triggerCondition = event.triggerCondition,
+            priority = event.priority.toLong(),
+            isRepeatable = if (event.isRepeatable) 1L else 0L
+        )
+    }
+
+    /**
+     * 删除事件
+     */
+    suspend fun deleteEvent(eventId: String, storyId: String) {
+        eventQueries.deleteEvent(eventId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.GameEvent.toGameEvent(): GameEvent {
+        return GameEvent(
+            id = id,
+            name = name,
+            description = description,
+            startNodeId = startNodeId,
+            triggerCondition = triggerCondition,
+            priority = priority.toInt(),
+            isRepeatable = isRepeatable == 1L
+        )
+    }
+    // ============================================================================================
+    // 线索管理方法
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有线索
+     */
+    suspend fun getClues(storyId: String): List<Clue> {
+        return clueQueries.getCluesForStory(storyId).executeAsList().map { it.toClue() }
+    }
+
+    /**
+     * 保存线索
+     */
+    suspend fun saveClue(clue: Clue, storyId: String) {
+        clueQueries.insertClue(
+            id = clue.id,
+            storyId = storyId,
+            name = clue.name,
+            description = clue.description,
+            isKnown = if (clue.isKnown) 1L else 0L
+        )
+    }
+
+    /**
+     * 删除线索
+     */
+    suspend fun deleteClue(clueId: String, storyId: String) {
+        clueQueries.deleteClue(clueId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Clue.toClue(): Clue {
+        return Clue(
+            id = id,
+            name = name,
+            description = description,
+            isKnown = isKnown == 1L
+        )
+    }
+
+    // ============================================================================================
+    // 阵营管理方法
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有阵营
+     */
+    suspend fun getFactions(storyId: String): List<Faction> {
+        return factionQueries.getFactionsForStory(storyId).executeAsList().map { it.toFaction() }
+    }
+
+    /**
+     * 保存阵营
+     */
+    suspend fun saveFaction(faction: Faction, storyId: String) {
+        factionQueries.insertFaction(
+            id = faction.id,
+            storyId = storyId,
+            name = faction.name,
+            description = faction.description,
+            reputation = faction.reputation.toLong()
+        )
+    }
+
+    /**
+     * 删除阵营
+     */
+    suspend fun deleteFaction(factionId: String, storyId: String) {
+        factionQueries.deleteFaction(factionId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Faction.toFaction(): Faction {
+        return Faction(
+            id = id,
+            name = name,
+            description = description,
+            reputation = reputation.toInt()
+        )
+    }
+    // ============================================================================================
+    // 创建示例故事
+    // ============================================================================================
     private fun createSampleStory(): Story {
         val nodes = mutableMapOf<String, StoryNode>()
         

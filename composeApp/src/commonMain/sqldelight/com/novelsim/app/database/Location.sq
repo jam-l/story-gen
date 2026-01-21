@@ -1,0 +1,34 @@
+-- Location table: stores location definitions
+CREATE TABLE Location (
+    id TEXT NOT NULL,
+    storyId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    background TEXT,
+    connectedLocationIdsJson TEXT NOT NULL DEFAULT '[]', -- List<String>
+    npcsJson TEXT NOT NULL DEFAULT '[]', -- List<String> characterIds
+    eventsJson TEXT NOT NULL DEFAULT '[]', -- List<String> eventIds
+    PRIMARY KEY (id, storyId),
+    FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+-- Get all locations for a story
+getLocationsForStory:
+SELECT * FROM Location WHERE storyId = ?;
+
+-- Get single location
+getLocationById:
+SELECT * FROM Location WHERE id = ? AND storyId = ?;
+
+-- Insert or replace location
+insertLocation:
+INSERT OR REPLACE INTO Location(id, storyId, name, description, background, connectedLocationIdsJson, npcsJson, eventsJson)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Delete location
+deleteLocation:
+DELETE FROM Location WHERE id = ? AND storyId = ?;
+
+-- Delete all locations for a story
+deleteLocationsForStory:
+DELETE FROM Location WHERE storyId = ?;

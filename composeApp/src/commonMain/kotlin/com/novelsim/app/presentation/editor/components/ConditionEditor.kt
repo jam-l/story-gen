@@ -26,96 +26,36 @@ import com.novelsim.app.data.model.*
 fun ConditionEditor(
     content: NodeContent.Condition,
     availableNodes: List<StoryNode>,
+    clues: List<Clue> = emptyList(),
+    factions: List<Faction> = emptyList(),
+    characters: List<Character> = emptyList(),
+    locations: List<Location> = emptyList(),
     onContentChange: (NodeContent) -> Unit
 ) {
-    var expressionType by remember { mutableStateOf(parseExpressionType(content.expression)) }
-    var variableName by remember { mutableStateOf(parseVariableName(content.expression)) }
-    var operator by remember { mutableStateOf(parseOperator(content.expression)) }
-    var value by remember { mutableStateOf(parseValue(content.expression)) }
     
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 条件类型选择
+        ConditionExpressionEditor(
+            expression = content.expression,
+            clues = clues,
+            factions = factions,
+            onExpressionChange = { newExpression ->
+                onContentChange(content.copy(expression = newExpression))
+            }
+        )
+
+        HorizontalDivider()
+        
+        // 目标节点选择
         Text(
-            text = "条件类型",
+            text = "分支目标",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold
         )
         
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ConditionTypeChip(
-                label = "变量",
-                selected = expressionType == ExpressionType.VARIABLE,
-                onClick = { 
-                    expressionType = ExpressionType.VARIABLE
-                    updateExpression(expressionType, variableName, operator, value, onContentChange, content)
-                }
-            )
-            ConditionTypeChip(
-                label = "道具",
-                selected = expressionType == ExpressionType.ITEM,
-                onClick = { 
-                    expressionType = ExpressionType.ITEM
-                    updateExpression(expressionType, variableName, operator, value, onContentChange, content)
-                }
-            )
-            ConditionTypeChip(
-                label = "标记",
-                selected = expressionType == ExpressionType.FLAG,
-                onClick = { 
-                    expressionType = ExpressionType.FLAG
-                    updateExpression(expressionType, variableName, operator, value, onContentChange, content)
-                }
-            )
-        }
-        
         HorizontalDivider()
         
-        // 根据类型显示不同的编辑器
-        when (expressionType) {
-            ExpressionType.VARIABLE -> {
-                VariableConditionEditor(
-                    variableName = variableName,
-                    operator = operator,
-                    value = value,
-                    onVariableChange = { 
-                        variableName = it
-                        updateExpression(expressionType, it, operator, value, onContentChange, content)
-                    },
-                    onOperatorChange = { 
-                        operator = it
-                        updateExpression(expressionType, variableName, it, value, onContentChange, content)
-                    },
-                    onValueChange = { 
-                        value = it
-                        updateExpression(expressionType, variableName, operator, it, onContentChange, content)
-                    }
-                )
-            }
-            ExpressionType.ITEM -> {
-                ItemConditionEditor(
-                    itemId = variableName,
-                    onItemChange = {
-                        variableName = it
-                        onContentChange(content.copy(expression = "has_item:$it"))
-                    }
-                )
-            }
-            ExpressionType.FLAG -> {
-                FlagConditionEditor(
-                    flagName = variableName,
-                    onFlagChange = {
-                        variableName = it
-                        onContentChange(content.copy(expression = "flag:$it"))
-                    }
-                )
-            }
-        }
-        
-        HorizontalDivider()
         
         // 目标节点选择
         Text(
@@ -139,6 +79,109 @@ fun ConditionEditor(
             availableNodes = availableNodes,
             onNodeSelect = { onContentChange(content.copy(falseNextNodeId = it)) }
         )
+    }
+}
+
+/**
+ * 独立的条件表达式编辑器，可复用
+ */
+@Composable
+fun ConditionExpressionEditor(
+    expression: String,
+    clues: List<Clue> = emptyList(),
+    factions: List<Faction> = emptyList(),
+    onExpressionChange: (String) -> Unit
+) {
+    var expressionType by remember(expression) { mutableStateOf(parseExpressionType(expression)) }
+    var variableName by remember(expression) { mutableStateOf(parseVariableName(expression)) }
+    var operator by remember(expression) { mutableStateOf(parseOperator(expression)) }
+    var value by remember(expression) { mutableStateOf(parseValue(expression)) }
+
+    // Helper to constructing expression string and notify change
+    fun update() {
+        val newExpr = when (expressionType) {
+            ExpressionType.VARIABLE -> "$variableName $operator $value"
+            ExpressionType.ITEM -> "has_item:$variableName"
+            ExpressionType.CLUE -> "has_clue:$variableName"
+            ExpressionType.FACTION -> "reputation:$variableName $operator $value"
+            ExpressionType.FLAG -> "flag:$variableName"
+        }
+        onExpressionChange(newExpr)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // 条件类型选择
+        Text(
+            text = "条件类型",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ConditionTypeChip("变量", expressionType == ExpressionType.VARIABLE) { 
+                expressionType = ExpressionType.VARIABLE; update() 
+            }
+            ConditionTypeChip("道具", expressionType == ExpressionType.ITEM) { 
+                expressionType = ExpressionType.ITEM; update() 
+            }
+            ConditionTypeChip("标记", expressionType == ExpressionType.FLAG) { 
+                expressionType = ExpressionType.FLAG; update() 
+            }
+        }
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+             ConditionTypeChip("线索", expressionType == ExpressionType.CLUE) { 
+                expressionType = ExpressionType.CLUE; update() 
+            }
+            ConditionTypeChip("阵营", expressionType == ExpressionType.FACTION) { 
+                expressionType = ExpressionType.FACTION; update() 
+            }
+        }
+        
+        HorizontalDivider()
+        
+        when {
+            expressionType == ExpressionType.VARIABLE -> {
+                VariableConditionEditor(
+                    variableName = variableName,
+                    operator = operator,
+                    value = value,
+                    onVariableChange = { variableName = it; update() },
+                    onOperatorChange = { operator = it; update() },
+                    onValueChange = { value = it; update() }
+                )
+            }
+            expressionType == ExpressionType.ITEM -> {
+                ItemConditionEditor(
+                    itemId = variableName,
+                    onItemChange = { variableName = it; update() }
+                )
+            }
+            expressionType == ExpressionType.CLUE -> {
+                ClueConditionEditor(
+                    clueId = variableName,
+                    clues = clues,
+                    onClueChange = { variableName = it; update() }
+                )
+            }
+            expressionType == ExpressionType.FACTION -> {
+                FactionConditionEditor(
+                    factionId = variableName,
+                    operator = operator,
+                    value = value,
+                    factions = factions,
+                    onFactionChange = { variableName = it; update() },
+                    onOperatorChange = { operator = it; update() },
+                    onValueChange = { value = it; update() }
+                )
+            }
+            expressionType == ExpressionType.FLAG -> {
+                FlagConditionEditor(
+                    flagName = variableName,
+                    onFlagChange = { variableName = it; update() }
+                )
+            }
+        }
     }
 }
 
@@ -360,11 +403,13 @@ private fun NodeSelector(
 }
 
 // 辅助函数
-private enum class ExpressionType { VARIABLE, ITEM, FLAG }
+private enum class ExpressionType { VARIABLE, ITEM, CLUE, FACTION, FLAG }
 
 private fun parseExpressionType(expression: String): ExpressionType {
     return when {
         expression.startsWith("has_item:") -> ExpressionType.ITEM
+        expression.startsWith("has_clue:") -> ExpressionType.CLUE
+        expression.startsWith("reputation:") -> ExpressionType.FACTION
         expression.startsWith("flag:") -> ExpressionType.FLAG
         else -> ExpressionType.VARIABLE
     }
@@ -373,6 +418,11 @@ private fun parseExpressionType(expression: String): ExpressionType {
 private fun parseVariableName(expression: String): String {
     return when {
         expression.startsWith("has_item:") -> expression.removePrefix("has_item:")
+        expression.startsWith("has_clue:") -> expression.removePrefix("has_clue:")
+        expression.startsWith("reputation:") -> {
+             val part = expression.removePrefix("reputation:")
+             part.split(Regex("[><=!]+")).firstOrNull()?.trim() ?: ""
+        }
         expression.startsWith("flag:") -> expression.removePrefix("flag:")
         else -> expression.split(Regex("[><=!]+")).firstOrNull()?.trim() ?: ""
     }
@@ -388,21 +438,11 @@ private fun parseValue(expression: String): String {
     return if (parts.size > 1) parts.last().trim() else ""
 }
 
-private fun updateExpression(
-    type: ExpressionType,
-    variableName: String,
-    operator: String,
-    value: String,
-    onContentChange: (NodeContent) -> Unit,
-    content: NodeContent.Condition
-) {
-    val expression = when (type) {
-        ExpressionType.VARIABLE -> "$variableName $operator $value"
-        ExpressionType.ITEM -> "has_item:$variableName"
-        ExpressionType.FLAG -> "flag:$variableName"
-    }
-    onContentChange(content.copy(expression = expression))
-}
+// private fun updateExpression removed as it is now local inside ConditionExpressionEditor
+
+// ) {
+// Removed
+// }
 
 private fun getNodePreview(node: StoryNode): String {
     return when (val c = node.content) {
@@ -413,5 +453,146 @@ private fun getNodePreview(node: StoryNode): String {
         is NodeContent.ItemAction -> "${c.action}: ${c.itemId}"
         is NodeContent.VariableAction -> "${c.variableName} ${c.operation}"
         is NodeContent.Ending -> "结局: ${c.title}"
+    }
+}
+
+@Composable
+private fun ClueConditionEditor(
+    clueId: String,
+    clues: List<Clue>,
+    onClueChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "检查玩家是否已获得线索",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = clueId,
+                onValueChange = onClueChange,
+                label = { Text("线索 ID") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                     IconButton(onClick = { expanded = true }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "选择线索")
+                    }
+                }
+            )
+            
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.7f)
+            ) {
+                clues.forEach { clue ->
+                    DropdownMenuItem(
+                        text = { Text(clue.name) },
+                        onClick = {
+                            onClueChange(clue.id)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FactionConditionEditor(
+    factionId: String,
+    operator: String,
+    value: String,
+    factions: List<Faction>,
+    onFactionChange: (String) -> Unit,
+    onOperatorChange: (String) -> Unit,
+    onValueChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "检查阵营声望值",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+         Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = factionId,
+                onValueChange = onFactionChange,
+                label = { Text("阵营 ID") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                     IconButton(onClick = { expanded = true }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "选择阵营")
+                    }
+                }
+            )
+             DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.7f)
+            ) {
+                factions.forEach { faction ->
+                    DropdownMenuItem(
+                        text = { Text(faction.name) },
+                        onClick = {
+                            onFactionChange(faction.id)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+        
+         Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 运算符选择
+            var opExpanded by remember { mutableStateOf(false) }
+            val operators = listOf(">" to "大于", ">=" to "大于等于", "==" to "等于", "<" to "小于", "<=" to "小于等于")
+            
+            Box(modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = { opExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(operators.find { it.first == operator }?.second ?: "运算符")
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+                
+                DropdownMenu(
+                    expanded = opExpanded,
+                    onDismissRequest = { opExpanded = false }
+                ) {
+                    operators.forEach { (op, label) ->
+                        DropdownMenuItem(
+                            text = { Text("$label ($op)") },
+                            onClick = {
+                                onOperatorChange(op)
+                                opExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            
+             OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text("声望值") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+        }
     }
 }

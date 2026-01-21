@@ -4,6 +4,7 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import com.novelsim.app.data.model.*
 import com.novelsim.app.data.repository.StoryRepository
+import com.novelsim.app.data.repository.StoryExporter
 import com.novelsim.app.util.PlatformUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,7 +47,13 @@ class EditorScreenModel(
         val isSaving: Boolean = false,
         val storyTitle: String = "新故事",
         val storyDescription: String = "",
-        val isListMode: Boolean = false // 是否为列表模式
+        val isListMode: Boolean = false, // 是否为列表模式
+        val showDatabaseEditor: Boolean = false, // 是否显示数据库编辑器
+        val characters: List<Character> = emptyList(), // 角色列表
+        val locations: List<Location> = emptyList(), // 地点列表
+        val events: List<GameEvent> = emptyList(), // 事件列表
+        val clues: List<Clue> = emptyList(), // 线索列表
+        val factions: List<Faction> = emptyList() // 阵营列表
     )
     
     private val _uiState = MutableStateFlow(UiState())
@@ -81,6 +88,12 @@ class EditorScreenModel(
                     storyDescription = story.description,
                     nodes = story.nodes.values.map { EditorNode(it) }
                 )
+                // 加载关联数据
+                loadCharacters()
+                loadLocations()
+                loadEvents()
+                loadClues()
+                loadFactions()
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -314,6 +327,13 @@ class EditorScreenModel(
     }
     
     /**
+     * 切换数据库编辑器显示
+     */
+    fun toggleDatabaseEditor(show: Boolean) {
+        _uiState.update { it.copy(showDatabaseEditor = show) }
+    }
+
+    /**
      * 切换视图模式
      */
     fun toggleViewMode() {
@@ -363,6 +383,192 @@ class EditorScreenModel(
         }
     }
     
+    
+    // ============================================================================================
+    // 角色管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载角色列表
+     */
+    private fun loadCharacters() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val characters = storyRepository.getCharacters(storyId)
+            _uiState.update { it.copy(characters = characters) }
+        }
+    }
+    
+    /**
+     * 保存角色
+     */
+    fun saveCharacter(character: Character) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveCharacter(character, storyId)
+            loadCharacters()
+        }
+    }
+    
+    /**
+     * 删除角色
+     */
+    fun deleteCharacter(characterId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteCharacter(characterId, storyId)
+            loadCharacters()
+        }
+    }
+    
+    // ============================================================================================
+    // 地点管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载地点列表
+     */
+    private fun loadLocations() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val locations = storyRepository.getLocations(storyId)
+            _uiState.update { it.copy(locations = locations) }
+        }
+    }
+    
+    /**
+     * 保存地点
+     */
+    fun saveLocation(location: Location) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveLocation(location, storyId)
+            loadLocations()
+        }
+    }
+    
+    /**
+     * 删除地点
+     */
+    fun deleteLocation(locationId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteLocation(locationId, storyId)
+            loadLocations()
+        }
+    }
+    
+    // ============================================================================================
+    // 事件管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载事件列表
+     */
+    private fun loadEvents() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val events = storyRepository.getEvents(storyId)
+            _uiState.update { it.copy(events = events) }
+        }
+    }
+    
+    /**
+     * 保存事件
+     */
+    fun saveEvent(event: GameEvent) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveEvent(event, storyId)
+            loadEvents()
+        }
+    }
+    
+    /**
+     * 删除事件
+     */
+    fun deleteEvent(eventId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteEvent(eventId, storyId)
+            loadEvents()
+        }
+    }
+    
+    // ============================================================================================
+    // 线索管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载线索列表
+     */
+    private fun loadClues() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val clues = storyRepository.getClues(storyId)
+            _uiState.update { it.copy(clues = clues) }
+        }
+    }
+    
+    /**
+     * 保存线索
+     */
+    fun saveClue(clue: Clue) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveClue(clue, storyId)
+            loadClues()
+        }
+    }
+    
+    /**
+     * 删除线索
+     */
+    fun deleteClue(clueId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteClue(clueId, storyId)
+            loadClues()
+        }
+    }
+    
+    // ============================================================================================
+    // 阵营管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载阵营列表
+     */
+    private fun loadFactions() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val factions = storyRepository.getFactions(storyId)
+            _uiState.update { it.copy(factions = factions) }
+        }
+    }
+    
+    /**
+     * 保存阵营
+     */
+    fun saveFaction(faction: Faction) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveFaction(faction, storyId)
+            loadFactions()
+        }
+    }
+    
+    /**
+     * 删除阵营
+     */
+    fun deleteFaction(factionId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteFaction(factionId, storyId)
+            loadFactions()
+        }
+    }
+
     /**
      * 导出为 JSON
      */
@@ -381,6 +587,13 @@ class EditorScreenModel(
             updatedAt = PlatformUtils.getCurrentTimeMillis()
         )
         
-        return json.encodeToString(story)
+        return StoryExporter.exportToJson(
+            story = story,
+            characters = _uiState.value.characters,
+            locations = _uiState.value.locations,
+            events = _uiState.value.events,
+            clues = _uiState.value.clues,
+            factions = _uiState.value.factions
+        )
     }
 }

@@ -1,0 +1,35 @@
+-- Character table: stores character definitions
+CREATE TABLE Character (
+    id TEXT NOT NULL,
+    storyId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    avatar TEXT,
+    baseStatsJson TEXT NOT NULL, -- JSON serialized CharacterStats
+    factionId TEXT,
+    relationshipsJson TEXT NOT NULL DEFAULT '{}', -- Map<String, Int> targetId -> affinity
+    tagsJson TEXT NOT NULL DEFAULT '[]', -- List<String>
+    PRIMARY KEY (id, storyId),
+    FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+-- Get all characters for a story
+getCharactersForStory:
+SELECT * FROM Character WHERE storyId = ?;
+
+-- Get single character
+getCharacterById:
+SELECT * FROM Character WHERE id = ? AND storyId = ?;
+
+-- Insert or replace character
+insertCharacter:
+INSERT OR REPLACE INTO Character(id, storyId, name, description, avatar, baseStatsJson, factionId, relationshipsJson, tagsJson)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Delete character
+deleteCharacter:
+DELETE FROM Character WHERE id = ? AND storyId = ?;
+
+-- Delete all characters for a story
+deleteCharactersForStory:
+DELETE FROM Character WHERE storyId = ?;

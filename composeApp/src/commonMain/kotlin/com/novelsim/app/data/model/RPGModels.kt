@@ -203,7 +203,11 @@ data class GameState(
     val variables: MutableMap<String, String> = mutableMapOf(),
     val gold: Int = 0,
     val playTime: Long = 0L,
-    val flags: MutableSet<String> = mutableSetOf()
+    val flags: MutableSet<String> = mutableSetOf(),
+    val collectedClues: MutableSet<String> = mutableSetOf(),
+    val factionReputations: MutableMap<String, Int> = mutableMapOf(),
+    val characterRelationships: MutableMap<String, Int> = mutableMapOf(),
+    val triggeredEvents: MutableSet<String> = mutableSetOf()
 )
 
 /**

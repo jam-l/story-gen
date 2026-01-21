@@ -17,6 +17,7 @@ class StoryEngine(
 ) {
     private var currentStory: Story? = null
     private var currentGameState: GameState? = null
+    private var events: Map<String, GameEvent> = emptyMap()
     
     /**
      * 加载故事并初始化游戏状态
@@ -31,6 +32,9 @@ class StoryEngine(
             currentNodeId = story.startNodeId,
             variables = story.variables.toMutableMap()
         )
+        
+        // 加载并缓存故事事件
+        events = storyRepository.getEvents(storyId).associateBy { it.id }
         
         val startNode = story.nodes[story.startNodeId]
             ?: return Result.failure(Exception("起始节点不存在: ${story.startNodeId}"))
@@ -137,9 +141,37 @@ class StoryEngine(
                 val itemId = expression.removePrefix("has_item:")
                 state.inventory.any { it.itemId == itemId && it.quantity > 0 }
             }
+            expression.startsWith("has_clue:") -> {
+                val clueId = expression.removePrefix("has_clue:")
+                state.collectedClues.contains(clueId)
+            }
             expression.startsWith("flag:") -> {
                 val flagName = expression.removePrefix("flag:")
                 flagName in state.flags
+            }
+            expression.startsWith("reputation:") -> {
+                // expecting "reputation:factionId > 50"
+                // split by space first to get "reputation:factionId", ">", "50"
+                // or just regex/parsing
+                val parts = expression.trim().split(Regex("\\s+"))
+                if (parts.size >= 3) {
+                    val reputationKey = parts[0] // reputation:factionId
+                    val operator = parts[1]
+                    val value = parts[2].toIntOrNull() ?: 0
+                    
+                    val factionId = reputationKey.removePrefix("reputation:")
+                    val currentRep = state.factionReputations[factionId] ?: 0
+                    
+                    when (operator) {
+                        ">" -> currentRep > value
+                        ">=" -> currentRep >= value
+                        "<" -> currentRep < value
+                        "<=" -> currentRep <= value
+                        "==" -> currentRep == value
+                        "!=" -> currentRep != value
+                        else -> false
+                    }
+                } else false
             }
             expression.contains(">") -> {
                 val parts = expression.split(">").map { it.trim() }
@@ -226,7 +258,42 @@ class StoryEngine(
                 currentGameState = state.copy(playerStats = newStats)
             }
             is Effect.PlaySound -> {
-                // TODO: 实现音效播放
+                // TODO: 实现音效播放 (需接入平台音频API)
+            }
+            is Effect.AddClue -> {
+               state.collectedClues.add(effect.clueId)
+            }
+            is Effect.ModifyReputation -> {
+                val currentRep = state.factionReputations[effect.factionId] ?: 0
+                state.factionReputations[effect.factionId] = currentRep + effect.amount
+            }
+            is Effect.ModifyRelationship -> {
+                val currentRel = state.characterRelationships[effect.characterId] ?: 0
+                state.characterRelationships[effect.characterId] = currentRel + effect.amount
+            }
+            is Effect.MoveToLocation -> {
+                state.variables["current_location"] = effect.locationId
+            }
+            is Effect.TriggerEvent -> {
+                val event = events[effect.eventId] ?: return
+                
+                // 检查是否可重复触发
+                if (!event.isRepeatable && state.triggeredEvents.contains(effect.eventId)) {
+                    return
+                }
+                
+                // 检查触发条件
+                if (event.triggerCondition != null && !evaluateCondition(event.triggerCondition)) {
+                    return
+                }
+                
+                // 触发事件
+                state.triggeredEvents.add(effect.eventId)
+                
+                // 如果事件有关联的起始节点，且当前处于自动流转状态（非Choice跳转），
+                // 这里可以考虑直接跳转。但在 processChoice 中，通常由 options 控制跳转。
+                // 这里的 TriggerEvent 更多作为"标记"或"解锁"使用。
+                // 如果需要强制跳转，建议在 Option 中直接指定 nextNodeId 为事件起始节点。
             }
         }
     }
