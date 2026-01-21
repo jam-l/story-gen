@@ -61,8 +61,9 @@ data class EditorScreen(
                     isSaving = uiState.isSaving,
                     isListMode = uiState.isListMode,
                     onBack = {
-                        screenModel.saveStory()
-                        navigator.pop()
+                        screenModel.saveStory {
+                            navigator.pop()
+                        }
                     },
                     onSave = { screenModel.saveStory() },
                     onExport = { 
@@ -242,6 +243,7 @@ private fun EditorTopBar(
                 IconButton(onClick = {
                     onTitleChange(editedTitle)
                     isEditing = false
+                    onSave()
                 }) {
                     Icon(Icons.Default.Check, contentDescription = "确认")
                 }

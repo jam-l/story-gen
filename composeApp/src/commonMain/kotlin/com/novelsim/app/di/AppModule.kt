@@ -8,6 +8,7 @@ import com.novelsim.app.data.repository.SaveRepository
 import com.novelsim.app.presentation.home.HomeScreenModel
 import com.novelsim.app.presentation.player.StoryPlayerScreenModel
 import com.novelsim.app.presentation.editor.EditorScreenModel
+import com.novelsim.app.presentation.generator.GeneratorScreenModel
 import org.koin.dsl.module
 
 /**
@@ -27,4 +28,5 @@ val appModule = module {
     factory { HomeScreenModel(get(), get()) }
     factory { params -> StoryPlayerScreenModel(params.get(), get(), get()) }
     factory { params -> EditorScreenModel(params.getOrNull(), get()) }
+    factory { GeneratorScreenModel(get()) }
 }

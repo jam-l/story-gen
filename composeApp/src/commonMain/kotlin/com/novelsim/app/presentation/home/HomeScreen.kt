@@ -28,8 +28,7 @@ import com.novelsim.app.data.model.Story
 import com.novelsim.app.data.model.SaveData
 import com.novelsim.app.presentation.player.StoryPlayerScreen
 import com.novelsim.app.presentation.editor.EditorScreen
-import com.novelsim.app.presentation.home.components.RandomGeneratorDialog
-import com.novelsim.app.domain.generator.RandomStoryGenerator
+import com.novelsim.app.presentation.generator.GeneratorScreen
 
 /**
  * 主页屏幕
@@ -106,9 +105,8 @@ class HomeScreen : Screen {
                                         onEditStory = { story ->
                                             navigator.push(EditorScreen(story.id))
                                         },
-                                        onRandomGenerate = { story ->
-                                            screenModel.addRandomStory(story)
-                                            navigator.push(EditorScreen(story.id))
+                                        onRandomGenerate = {
+                                            navigator.push(GeneratorScreen())
                                         }
                                     )
                                 }
@@ -441,9 +439,8 @@ private fun EditorListContent(
     stories: List<Story>,
     onNewStory: () -> Unit,
     onEditStory: (Story) -> Unit,
-    onRandomGenerate: (Story) -> Unit
+    onRandomGenerate: () -> Unit
 ) {
-    var showRandomDialog by remember { mutableStateOf(false) }
     
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -488,7 +485,7 @@ private fun EditorListContent(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showRandomDialog = true },
+                    .clickable { onRandomGenerate() },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer
@@ -553,18 +550,7 @@ private fun EditorListContent(
         }
     }
     
-    // 随机生成对话框
-    if (showRandomDialog) {
-        RandomGeneratorDialog(
-            onGenerate = { config, title ->
-                val generator = RandomStoryGenerator(config)
-                val story = generator.generate(title)
-                onRandomGenerate(story)
-                showRandomDialog = false
-            },
-            onDismiss = { showRandomDialog = false }
-        )
-    }
+
 }
 
 @Composable

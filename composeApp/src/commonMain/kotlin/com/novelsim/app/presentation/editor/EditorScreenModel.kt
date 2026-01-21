@@ -356,7 +356,7 @@ class EditorScreenModel(
     /**
      * 保存故事
      */
-    fun saveStory() {
+    fun saveStory(onSaved: () -> Unit = {}) {
         screenModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true)
             
@@ -380,6 +380,7 @@ class EditorScreenModel(
                 isSaving = false,
                 story = story
             )
+            onSaved()
         }
     }
     

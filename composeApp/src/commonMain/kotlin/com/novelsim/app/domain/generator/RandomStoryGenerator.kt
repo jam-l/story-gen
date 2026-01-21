@@ -47,6 +47,12 @@ class RandomStoryGenerator(
         /** 故事主题 */
         val theme: StoryTheme = StoryTheme.FANTASY,
         
+        /** 混乱度 (0.0-1.0): 控制结构的非线性程度 */
+        val chaos: Float = 0.0f,
+        
+        /** 难度 (0.0-1.0): 影响数值和挑战性 */
+        val difficulty: Float = 0.5f,
+        
         /** 随机种子（null 表示随机） */
         val seed: Long? = null
     )
@@ -375,12 +381,17 @@ class RandomStoryGenerator(
     }
     
     private fun createBattleNode(id: String, x: Float, y: Float): StoryNode {
-        val enemies = listOf("slime", "goblin", "wolf", "bandit", "skeleton")
+        val enemies = listOf("slime", "goblin", "wolf", "bandit", "skeleton", "dark_knight", "dragon")
+        // 根据难度选择敌人范围
+        val maxEnemyIndex = (enemies.size * config.difficulty).toInt().coerceIn(0, enemies.size)
+        // 确保至少有一个敌人可选
+        val availableEnemies = enemies.take(maxOf(1, maxEnemyIndex + 1))
+        
         return StoryNode(
             id = id,
             type = NodeType.BATTLE,
             content = NodeContent.Battle(
-                enemyId = enemies[random.nextInt(enemies.size)],
+                enemyId = availableEnemies[random.nextInt(availableEnemies.size)],
                 winNextNodeId = "",
                 loseNextNodeId = ""
             ),
@@ -389,11 +400,16 @@ class RandomStoryGenerator(
     }
     
     private fun createConditionNode(id: String, x: Float, y: Float): StoryNode {
+        // 根据难度调整数值
+        val goldBase = (100 * config.difficulty).toInt() + 10
+        val levelBase = (10 * config.difficulty).toInt() + 1
+        
         val conditions = listOf(
-            "player_level > 5",
+            "player_level > $levelBase",
             "has_item:key_gold",
             "flag:boss_defeated",
-            "gold >= 100"
+            "gold >= $goldBase",
+            "reputation:kingdom > ${if (config.difficulty > 0.5) 10 else 0}"
         )
         return StoryNode(
             id = id,
@@ -410,12 +426,15 @@ class RandomStoryGenerator(
     private fun createItemNode(id: String, x: Float, y: Float): StoryNode {
         val items = listOf("potion_hp", "key_gold", "sword_iron", "scroll_magic")
         val actions = ItemActionType.entries
+        // 难度越高，获得的数量可能越少
+        val maxQty = maxOf(1, 5 - (config.difficulty * 4).toInt())
+        
         return StoryNode(
             id = id,
             type = NodeType.ITEM,
             content = NodeContent.ItemAction(
                 itemId = items[random.nextInt(items.size)],
-                quantity = random.nextInt(1, 4),
+                quantity = random.nextInt(1, maxQty + 1),
                 action = actions[random.nextInt(actions.size)],
                 nextNodeId = ""
             ),
@@ -426,13 +445,17 @@ class RandomStoryGenerator(
     private fun createVariableNode(id: String, x: Float, y: Float): StoryNode {
         val variables = listOf("score", "reputation", "gold", "exp")
         val operations = listOf(VariableOperation.ADD, VariableOperation.SET)
+        // 难度越高，获得的奖励数值越低
+        val baseValue = 100 - (config.difficulty * 80).toInt()
+        val value = random.nextInt(1, maxOf(10, baseValue)).toString()
+        
         return StoryNode(
             id = id,
             type = NodeType.VARIABLE,
             content = NodeContent.VariableAction(
                 variableName = variables[random.nextInt(variables.size)],
                 operation = operations[random.nextInt(operations.size)],
-                value = random.nextInt(1, 100).toString(),
+                value = value,
                 nextNodeId = ""
             ),
             position = NodePosition(x, y)
@@ -453,10 +476,18 @@ class RandomStoryGenerator(
         // 连接对话节点链
         for (i in 0 until dialogueNodes.size - 1) {
             val currentId = dialogueNodes[i]
-            val nextId = if (choiceNodes.isNotEmpty() && i == dialogueNodes.size / 2) {
-                choiceNodes.first()
+            
+            // Chaos 逻辑：有一定概率连接到随机节点（跳跃或回环），而不是下一个节点
+            // 避免连接到自己，且目标必须是 dialogueNodes 中的。
+            val nextId = if (random.nextFloat() < config.chaos && dialogueNodes.size > 2) {
+                val potentialTargets = dialogueNodes.filter { it != currentId }
+                potentialTargets[random.nextInt(potentialTargets.size)]
             } else {
-                dialogueNodes[i + 1]
+                if (choiceNodes.isNotEmpty() && i == dialogueNodes.size / 2) {
+                    choiceNodes.first()
+                } else {
+                    dialogueNodes[i + 1]
+                }
             }
             
             val currentNode = nodes[currentId]!!
@@ -473,11 +504,16 @@ class RandomStoryGenerator(
             val choice = choiceNode.content as NodeContent.Choice
             
             val updatedOptions = choice.options.mapIndexed { index, option ->
-                val targetId = when {
-                    index == 0 && endingNodes.isNotEmpty() -> endingNodes.first()
-                    (dialogueNodes.size / 2 + index) < dialogueNodes.size -> dialogueNodes[dialogueNodes.size / 2 + index]
-                    endingNodes.isNotEmpty() -> endingNodes[index % endingNodes.size]
-                    else -> dialogueNodes.lastOrNull() ?: "start"
+                // Chaos 逻辑也会影响选项的目标
+                val targetId = if (random.nextFloat() < config.chaos && dialogueNodes.isNotEmpty()) {
+                     dialogueNodes[random.nextInt(dialogueNodes.size)]
+                } else {
+                    when {
+                        index == 0 && endingNodes.isNotEmpty() -> endingNodes.first()
+                        (dialogueNodes.size / 2 + index) < dialogueNodes.size -> dialogueNodes[dialogueNodes.size / 2 + index]
+                        endingNodes.isNotEmpty() -> endingNodes[index % endingNodes.size]
+                        else -> dialogueNodes.lastOrNull() ?: "start"
+                    }
                 }
                 option.copy(nextNodeId = targetId)
             }
@@ -490,10 +526,15 @@ class RandomStoryGenerator(
         // 确保最后的对话节点连接到结局
         if (dialogueNodes.isNotEmpty() && endingNodes.isNotEmpty()) {
             val lastDialogueId = dialogueNodes.last()
-            val endingId = endingNodes.first()
+            
+            // 检查如果不包含连接才添加，避免覆盖之前的逻辑（如果有）
+            // 简单起见，这里强制连接最后一个，除非它已经有连接（在 chaos 逻辑中可能已经有）
             val lastNode = nodes[lastDialogueId]!!
-            nodes[lastDialogueId] = lastNode.copy(connections = listOf(Connection(endingId)))
-            updateNodeNextId(nodes, lastDialogueId, endingId)
+            if (lastNode.connections.isEmpty() || lastNode.connections[0].targetNodeId.isEmpty()) { 
+                val endingId = endingNodes.first()
+                nodes[lastDialogueId] = lastNode.copy(connections = listOf(Connection(endingId)))
+                updateNodeNextId(nodes, lastDialogueId, endingId)
+            }
         }
     }
     
