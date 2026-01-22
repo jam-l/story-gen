@@ -523,7 +523,7 @@ private fun NodeCard(
         is NodeContent.Dialogue -> content.text.take(30)
         is NodeContent.Choice -> content.prompt.take(30)
         is NodeContent.Condition -> content.expression
-        is NodeContent.Battle -> "战斗: ${content.enemyId}"
+        is NodeContent.Battle -> "战斗: ${content.enemy.name}"
         is NodeContent.ItemAction -> "${content.action}: ${content.itemId}"
         is NodeContent.VariableAction -> "${content.variableName} ${content.operation}"
         is NodeContent.Ending -> content.title

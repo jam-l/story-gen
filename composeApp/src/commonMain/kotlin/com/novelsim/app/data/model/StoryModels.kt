@@ -93,9 +93,7 @@ sealed class NodeContent {
      */
     @Serializable
     data class Battle(
-        val enemyId: String,
-        val enemyName: String? = null,
-        val enemyStats: CharacterStats? = null,
+        val enemy: Enemy,
         val winNextNodeId: String,
         val loseNextNodeId: String
     ) : NodeContent()

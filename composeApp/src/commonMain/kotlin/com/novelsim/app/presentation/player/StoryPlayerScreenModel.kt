@@ -34,6 +34,7 @@ class StoryPlayerScreenModel(
         val showSaveDialog: Boolean = false,
         val showInventory: Boolean = false,
         val showStatus: Boolean = false,
+        val showHistory: Boolean = false,
         val isTyping: Boolean = false,
         val displayedText: String = ""
     )
@@ -233,12 +234,10 @@ class StoryPlayerScreenModel(
      */
     private fun startBattle(node: StoryNode) {
         val content = node.content as? NodeContent.Battle ?: return
-        val story = _uiState.value.story ?: return
         val gameState = _uiState.value.gameState ?: return
         
-        val enemy = story.enemies.find { it.id == content.enemyId } ?: return
-        
-        val battleState = battleSystem.startBattle(gameState.playerStats, enemy)
+        // 直接使用嵌入在节点中的敌人数据，无需查找
+        val battleState = battleSystem.startBattle(gameState.playerStats, content.enemy)
         
         _uiState.value = _uiState.value.copy(
             displayMode = DisplayMode.BATTLE,
@@ -366,6 +365,15 @@ class StoryPlayerScreenModel(
     fun toggleStatus() {
         _uiState.value = _uiState.value.copy(
             showStatus = !_uiState.value.showStatus
+        )
+    }
+
+    /**
+     * 显示/隐藏历史记录
+     */
+    fun toggleHistory() {
+        _uiState.value = _uiState.value.copy(
+            showHistory = !_uiState.value.showHistory
         )
     }
 }

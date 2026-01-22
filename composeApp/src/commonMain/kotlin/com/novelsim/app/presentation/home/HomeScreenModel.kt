@@ -104,6 +104,8 @@ class HomeScreenModel(
         }
     }
     
+
+
     /**
      * 添加随机生成的故事
      */

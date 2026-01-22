@@ -150,7 +150,14 @@ class EditorScreenModel(
                 falseNextNodeId = ""
             )
             NodeType.BATTLE -> NodeContent.Battle(
-                enemyId = "",
+                enemy = Enemy(
+                    id = "new_enemy",
+                    name = "新敌人",
+                    description = "请编辑敌人属性",
+                    stats = CharacterStats(maxHp = 50, currentHp = 50, attack = 5, defense = 2),
+                    expReward = 10,
+                    goldReward = 5
+                ),
                 winNextNodeId = "",
                 loseNextNodeId = ""
             )

@@ -7,6 +7,7 @@ CREATE TABLE Story (
     version TEXT NOT NULL DEFAULT '1.0.0',
     startNodeId TEXT NOT NULL,
     variablesJson TEXT NOT NULL DEFAULT '{}',
+    enemiesJson TEXT NOT NULL DEFAULT '[]',
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL
 );
@@ -21,8 +22,8 @@ SELECT * FROM Story WHERE id = ?;
 
 -- Insert or replace story
 insertStory:
-INSERT OR REPLACE INTO Story(id, title, author, description, version, startNodeId, variablesJson, createdAt, updatedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Story(id, title, author, description, version, startNodeId, variablesJson, enemiesJson, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Update story metadata
 updateStoryMeta:

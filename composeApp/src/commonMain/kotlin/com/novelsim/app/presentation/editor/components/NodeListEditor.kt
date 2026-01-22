@@ -126,7 +126,7 @@ private fun getNodeSummary(content: NodeContent): String {
         is NodeContent.Dialogue -> "${content.speaker ?: "旁白"}: ${content.text}"
         is NodeContent.Choice -> "选择: ${content.prompt}"
         is NodeContent.Ending -> "结局: ${content.title}"
-        is NodeContent.Battle -> "战斗: ${content.enemyId}"
+        is NodeContent.Battle -> "战斗: ${content.enemy.name}"
         is NodeContent.Condition -> "条件: ${content.expression}"
         is NodeContent.ItemAction -> "物品: ${content.action} ${content.itemId}"
         is NodeContent.VariableAction -> "变量: ${content.variableName} ${content.operation} ${content.value}"

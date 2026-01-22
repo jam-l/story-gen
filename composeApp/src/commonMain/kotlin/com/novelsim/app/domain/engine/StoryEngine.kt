@@ -2,6 +2,7 @@ package com.novelsim.app.domain.engine
 
 import com.novelsim.app.data.model.*
 import com.novelsim.app.data.repository.StoryRepository
+import com.novelsim.app.util.PlatformUtils
 
 /**
  * 故事引擎 - 核心叙事逻辑处理
@@ -93,6 +94,15 @@ class StoryEngine(
             applyEffect(effect)
         }
         
+        // 记录选项历史
+        val historyItem = HistoryItem(
+            nodeId = state.currentNodeId,
+            text = option.text,
+            type = HistoryType.CHOICE,
+            timestamp = PlatformUtils.getCurrentTimeMillis()
+        )
+        currentGameState = state.copy(history = state.history + historyItem)
+        
         // 跳转到下一个节点
         return navigateToNode(option.nextNodeId)
     }
@@ -120,7 +130,33 @@ class StoryEngine(
         val nextNode = story.nodes[nodeId]
             ?: return Result.failure(Exception("节点不存在: $nodeId"))
         
-        currentGameState = currentGameState?.copy(currentNodeId = nodeId)
+        val now = PlatformUtils.getCurrentTimeMillis()
+        
+        // 记录节点历史 (仅记录对话节点和重要节点)
+        var newHistory = currentGameState?.history ?: emptyList()
+        if (nextNode.type == NodeType.DIALOGUE || nextNode.type == NodeType.END || nextNode.type == NodeType.BATTLE) {
+            val contentText = when(val content = nextNode.content) {
+                is NodeContent.Dialogue -> content.text
+                is NodeContent.Ending -> content.description
+                is NodeContent.Battle -> "遭遇敌人: ${content.enemy.name}"
+                else -> ""
+            }
+            
+            if (contentText.isNotEmpty()) {
+                val historyItem = HistoryItem(
+                    nodeId = nodeId,
+                    text = contentText,
+                    type = HistoryType.NODE,
+                    timestamp = now
+                )
+                newHistory = newHistory + historyItem
+            }
+        }
+
+        currentGameState = currentGameState?.copy(
+            currentNodeId = nodeId,
+            history = newHistory
+        )
         
         return Result.success(nextNode)
     }

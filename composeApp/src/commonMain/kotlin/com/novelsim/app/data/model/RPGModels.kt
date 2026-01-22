@@ -207,8 +207,21 @@ data class GameState(
     val collectedClues: MutableSet<String> = mutableSetOf(),
     val factionReputations: MutableMap<String, Int> = mutableMapOf(),
     val characterRelationships: MutableMap<String, Int> = mutableMapOf(),
-    val triggeredEvents: MutableSet<String> = mutableSetOf()
+    val triggeredEvents: MutableSet<String> = mutableSetOf(),
+    val history: List<HistoryItem> = emptyList()
 )
+
+@Serializable
+data class HistoryItem(
+    val nodeId: String,
+    val text: String,
+    val type: HistoryType,
+    val timestamp: Long
+)
+
+enum class HistoryType {
+    NODE, CHOICE, BATTLE
+}
 
 /**
  * 存档数据

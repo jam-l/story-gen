@@ -53,9 +53,27 @@ class GeneratorScreenModel(
     ) {
         screenModelScope.launch {
             val generator = RandomStoryGenerator(config)
-            val story = generator.generate(title)
-            storyRepository.saveStory(story)
-            onSuccess(story.id)
+            val generatedStory = generator.generate(title)
+            
+            // 强制修复：如果生成器返回空敌人（可能是缓存问题），手动注入默认敌人
+            val finalStory = if (generatedStory.enemies.isEmpty()) {
+                val fallbackEnemies = listOf(
+                    com.novelsim.app.data.model.Enemy(
+                        id = "slime_fallback",
+                        name = "史莱姆(补)",
+                        description = "系统自动补充的敌人",
+                        stats = com.novelsim.app.data.model.CharacterStats(maxHp = 50, currentHp = 50, attack = 5, defense = 0, speed = 5, exp = 5),
+                        expReward = 5,
+                        goldReward = 2
+                    )
+                )
+                generatedStory.copy(enemies = fallbackEnemies)
+            } else {
+                generatedStory
+            }
+            
+            storyRepository.saveStory(finalStory)
+            onSuccess(finalStory.id)
         }
     }
 }
@@ -75,6 +93,7 @@ private fun GeneratorScreenContent(
     var maxChoices by remember { mutableStateOf(5f) }
     var minEndings by remember { mutableStateOf(1f) }
     var maxEndings by remember { mutableStateOf(3f) }
+    var generateEnding by remember { mutableStateOf(true) }
     
     var battleProbability by remember { mutableStateOf(0.2f) }
     var conditionProbability by remember { mutableStateOf(0.15f) }
@@ -112,6 +131,7 @@ private fun GeneratorScreenContent(
                         maxChoices = maxChoices.toInt(),
                         minEndings = minEndings.toInt(),
                         maxEndings = maxEndings.toInt(),
+                        generateEnding = generateEnding,
                         battleProbability = battleProbability,
                         conditionProbability = conditionProbability,
                         itemProbability = itemProbability,
@@ -200,15 +220,35 @@ private fun GeneratorScreenContent(
                         )
                     }
                     
-                    SliderControl("结局数量", "${minEndings.toInt()} - ${maxEndings.toInt()}") {
-                        RangeSlider(
-                            value = minEndings..maxEndings,
-                            onValueChange = {
-                                minEndings = it.start
-                                maxEndings = it.endInclusive
-                            },
-                            valueRange = 1f..10f,
-                            steps = 8
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("生成结局", style = MaterialTheme.typography.bodyMedium)
+                        Switch(
+                            checked = generateEnding,
+                            onCheckedChange = { generateEnding = it }
+                        )
+                    }
+
+                    if (generateEnding) {
+                        SliderControl("结局数量", "${minEndings.toInt()} - ${maxEndings.toInt()}") {
+                            RangeSlider(
+                                value = minEndings..maxEndings,
+                                onValueChange = {
+                                    minEndings = it.start
+                                    maxEndings = it.endInclusive
+                                },
+                                valueRange = 1f..10f,
+                                steps = 8
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "无限模式：故事将循环进行，没有固定结局",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

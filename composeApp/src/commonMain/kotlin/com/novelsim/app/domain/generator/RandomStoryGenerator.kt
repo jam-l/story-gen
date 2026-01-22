@@ -52,6 +52,9 @@ class RandomStoryGenerator(
         
         /** 难度 (0.0-1.0): 影响数值和挑战性 */
         val difficulty: Float = 0.5f,
+
+        /** 是否生成结局 (false = 无限模式/循环) */
+        val generateEnding: Boolean = true,
         
         /** 随机种子（null 表示随机） */
         val seed: Long? = null
@@ -247,7 +250,11 @@ class RandomStoryGenerator(
     fun generate(title: String = "随机生成的故事"): Story {
         val nodeCount = random.nextInt(config.minNodes, config.maxNodes + 1)
         val choiceCount = random.nextInt(config.minChoices, config.maxChoices + 1)
-        val endingCount = random.nextInt(config.minEndings, config.maxEndings + 1)
+        val endingCount = if (config.generateEnding) {
+            random.nextInt(config.minEndings, config.maxEndings + 1)
+        } else {
+            0
+        }
         
         val nodes = mutableMapOf<String, StoryNode>()
         val nodeIds = mutableListOf<String>()
@@ -324,7 +331,9 @@ class RandomStoryGenerator(
             updatedAt = PlatformUtils.getCurrentTimeMillis()
         )
     }
-    
+
+
+
     private fun createDialogueNode(id: String, x: Float, y: Float): StoryNode {
         val templates = dialogueTemplates[config.theme] ?: dialogueTemplates[StoryTheme.FANTASY]!!
         val template = templates[random.nextInt(templates.size)]
@@ -381,17 +390,49 @@ class RandomStoryGenerator(
     }
     
     private fun createBattleNode(id: String, x: Float, y: Float): StoryNode {
-        val enemies = listOf("slime", "goblin", "wolf", "bandit", "skeleton", "dark_knight", "dragon")
-        // 根据难度选择敌人范围
-        val maxEnemyIndex = (enemies.size * config.difficulty).toInt().coerceIn(0, enemies.size)
-        // 确保至少有一个敌人可选
-        val availableEnemies = enemies.take(maxOf(1, maxEnemyIndex + 1))
+        // 根据难度计算基础属性
+        val baseHp = 50 + (50 * config.difficulty).toInt()
+        val baseAtk = 5 + (5 * config.difficulty).toInt()
+        
+        // 敌人模板列表
+        val enemyTemplates = listOf(
+            Triple("slime", "史莱姆", Triple(0.5, 0.5, 0)),
+            Triple("goblin", "哥布林", Triple(0.8, 1.0, 2)),
+            Triple("wolf", "野狼", Triple(1.0, 1.2, 3)),
+            Triple("bandit", "强盗", Triple(1.5, 1.1, 5)),
+            Triple("skeleton", "骷髅兵", Triple(1.2, 1.3, 8)),
+            Triple("dark_knight", "黑暗骑士", Triple(2.5, 1.8, 15)),
+            Triple("dragon", "幼龙", Triple(3.0, 2.5, 20))
+        )
+        
+        // 根据难度选择可用敌人范围
+        val maxEnemyIndex = (enemyTemplates.size * config.difficulty).toInt().coerceIn(0, enemyTemplates.size - 1)
+        val availableEnemies = enemyTemplates.take(maxOf(1, maxEnemyIndex + 1))
+        val template = availableEnemies[random.nextInt(availableEnemies.size)]
+        
+        val (enemyId, enemyName, statsMods) = template
+        val (hpMod, atkMod, defVal) = statsMods
+        
+        val enemy = Enemy(
+            id = enemyId,
+            name = enemyName,
+            description = "一个危险的敌人",
+            stats = CharacterStats(
+                maxHp = (baseHp * hpMod).toInt(),
+                currentHp = (baseHp * hpMod).toInt(),
+                attack = (baseAtk * atkMod).toInt(),
+                defense = defVal,
+                speed = 5 + random.nextInt(10)
+            ),
+            expReward = (10 * (1 + hpMod)).toInt(),
+            goldReward = (5 * (1 + hpMod)).toInt()
+        )
         
         return StoryNode(
             id = id,
             type = NodeType.BATTLE,
             content = NodeContent.Battle(
-                enemyId = availableEnemies[random.nextInt(availableEnemies.size)],
+                enemy = enemy,
                 winNextNodeId = "",
                 loseNextNodeId = ""
             ),
@@ -509,6 +550,15 @@ class RandomStoryGenerator(
                      dialogueNodes[random.nextInt(dialogueNodes.size)]
                 } else {
                     when {
+                        // 如果没有结局 (无限模式)，并且这是最后一个选项，或者正常逻辑下应该接结局
+                        endingNodes.isEmpty() -> {
+                            if (dialogueNodes.isNotEmpty()) {
+                                // 循环回前面的某个节点，或者连接到未被充分利用的节点
+                                dialogueNodes[random.nextInt(dialogueNodes.size)]
+                            } else {
+                                "start"
+                            }
+                        }
                         index == 0 && endingNodes.isNotEmpty() -> endingNodes.first()
                         (dialogueNodes.size / 2 + index) < dialogueNodes.size -> dialogueNodes[dialogueNodes.size / 2 + index]
                         endingNodes.isNotEmpty() -> endingNodes[index % endingNodes.size]

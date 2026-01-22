@@ -72,7 +72,8 @@ data class StoryPlayerScreen(
                                 onBack = { navigator.pop() },
                                 onSave = { screenModel.toggleSaveDialog() },
                                 onInventory = { screenModel.toggleInventory() },
-                                onStatus = { screenModel.toggleStatus() }
+                                onStatus = { screenModel.toggleStatus() },
+                                onHistory = { screenModel.toggleHistory() }
                             )
                         }
                         StoryPlayerScreenModel.DisplayMode.BATTLE -> {
@@ -106,6 +107,16 @@ data class StoryPlayerScreen(
                     onDismiss = { screenModel.toggleStatus() }
                 )
             }
+            
+            // 历史记录
+            if (uiState.showHistory) {
+                uiState.gameState?.history?.let { history ->
+                    HistoryDialog(
+                        history = history,
+                        onDismiss = { screenModel.toggleHistory() }
+                    )
+                }
+            }
         }
     }
 }
@@ -118,7 +129,8 @@ private fun StoryContent(
     onBack: () -> Unit,
     onSave: () -> Unit,
     onInventory: () -> Unit,
-    onStatus: () -> Unit
+    onStatus: () -> Unit,
+    onHistory: () -> Unit
 ) {
     val node = uiState.currentNode ?: return
     
@@ -140,7 +152,8 @@ private fun StoryContent(
             onBack = onBack,
             onSave = onSave,
             onInventory = onInventory,
-            onStatus = onStatus
+            onStatus = onStatus,
+            onHistory = onHistory
         )
         
         // 内容区域
@@ -231,7 +244,8 @@ private fun StoryTopBar(
     onBack: () -> Unit,
     onSave: () -> Unit,
     onInventory: () -> Unit,
-    onStatus: () -> Unit
+    onStatus: () -> Unit,
+    onHistory: () -> Unit
 ) {
     TopAppBar(
         title = { },
@@ -246,6 +260,9 @@ private fun StoryTopBar(
             }
             IconButton(onClick = onInventory) {
                 Icon(Icons.Default.Favorite, contentDescription = "背包")
+            }
+            IconButton(onClick = onHistory) {
+                Icon(Icons.Default.DateRange, contentDescription = "历史")
             }
             IconButton(onClick = onSave) {
                 Icon(Icons.Default.Done, contentDescription = "存档")
@@ -667,4 +684,39 @@ private fun ErrorContent(
             Text("返回")
         }
     }
+}
+
+@Composable
+private fun HistoryDialog(
+    history: List<HistoryItem>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("剧情回顾") },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                reverseLayout = true
+            ) {
+                items(history.reversed()) { item ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(
+                            text = item.text,
+                            style = if (item.type == HistoryType.CHOICE) 
+                                MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.primary)
+                                else MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (item.type == HistoryType.CHOICE) FontWeight.Bold else FontWeight.Normal
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(top = 4.dp), color = Color.Gray.copy(alpha = 0.2f))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
 }

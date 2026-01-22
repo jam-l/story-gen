@@ -134,39 +134,76 @@ fun BattleEditor(
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 敌人 ID
+        // 敌人名称
         OutlinedTextField(
-            value = content.enemyId,
-            onValueChange = { onContentChange(content.copy(enemyId = it)) },
-            label = { Text("敌人 ID") },
+            value = content.enemy.name,
+            onValueChange = { 
+                onContentChange(content.copy(enemy = content.enemy.copy(name = it))) 
+            },
+            label = { Text("敌人名称") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            placeholder = { Text("例如: boss_dragon") }
+            placeholder = { Text("例如: 黑暗骑士") }
         )
         
-        // 提示
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer
-            )
+        // 敌人描述
+        OutlinedTextField(
+            value = content.enemy.description,
+            onValueChange = { 
+                onContentChange(content.copy(enemy = content.enemy.copy(description = it))) 
+            },
+            label = { Text("敌人描述") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        
+        // 属性编辑
+        Text(
+            text = "敌人属性",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "敌人数据需要在 enemies.json 中定义",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-            }
+            OutlinedTextField(
+                value = content.enemy.stats.maxHp.toString(),
+                onValueChange = { 
+                    val hp = it.toIntOrNull() ?: content.enemy.stats.maxHp
+                    onContentChange(content.copy(enemy = content.enemy.copy(
+                        stats = content.enemy.stats.copy(maxHp = hp, currentHp = hp)
+                    ))) 
+                },
+                label = { Text("HP") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = content.enemy.stats.attack.toString(),
+                onValueChange = { 
+                    val atk = it.toIntOrNull() ?: content.enemy.stats.attack
+                    onContentChange(content.copy(enemy = content.enemy.copy(
+                        stats = content.enemy.stats.copy(attack = atk)
+                    ))) 
+                },
+                label = { Text("攻击") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = content.enemy.stats.defense.toString(),
+                onValueChange = { 
+                    val def = it.toIntOrNull() ?: content.enemy.stats.defense
+                    onContentChange(content.copy(enemy = content.enemy.copy(
+                        stats = content.enemy.stats.copy(defense = def)
+                    ))) 
+                },
+                label = { Text("防御") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
         }
         
         HorizontalDivider()

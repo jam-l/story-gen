@@ -95,6 +95,29 @@ class StoryRepository(
             startNodeId = dbStory.startNodeId,
             nodes = nodesMap,
             variables = variables,
+            enemies = try {
+                // 暂时添加调试信息
+                val loadedEnemies: List<Enemy> = json.decodeFromString(dbStory.enemiesJson)
+                if (loadedEnemies.isEmpty()) {
+                   // 如果也就是空的，可能是生成时就是空的?
+                   // 但 RandomStoryGenerator 不会为空。
+                   emptyList() 
+                } else {
+                   loadedEnemies
+                }
+            } catch (e: Exception) {
+                // 发生异常时，返回一个带有错误信息的假敌人，以便在UI中看到错误原因
+                 listOf(
+                    Enemy(
+                        id = "error_decoding",
+                        name = "数据读取错误",
+                        description = "无法解析敌人数据: ${e.message}",
+                        stats = CharacterStats(),
+                        expReward = 0,
+                        goldReward = 0
+                    )
+                )
+            },
             createdAt = dbStory.createdAt,
             updatedAt = dbStory.updatedAt
         )
@@ -104,22 +127,33 @@ class StoryRepository(
      * 保存故事（包括所有节点）
      */
     suspend fun saveStory(story: Story) {
-        // 保存故事元数据
-        storyQueries.insertStory(
-            id = story.id,
-            title = story.title,
-            author = story.author,
-            description = story.description,
-            version = story.version,
-            startNodeId = story.startNodeId,
-            variablesJson = json.encodeToString(story.variables),
-            createdAt = story.createdAt,
-            updatedAt = story.updatedAt
-        )
-        
-        // 保存所有节点
-        story.nodes.forEach { (nodeId, node) ->
-            saveNode(story.id, node)
+        storyQueries.transaction {
+            // 保存故事元数据
+            storyQueries.insertStory(
+                id = story.id,
+                title = story.title,
+                author = story.author,
+                description = story.description,
+                version = story.version,
+                startNodeId = story.startNodeId,
+                variablesJson = json.encodeToString(story.variables),
+                enemiesJson = json.encodeToString(story.enemies),  // 保留字段用于兼容，但不再关键
+                createdAt = story.createdAt,
+                updatedAt = story.updatedAt
+            )
+            
+            // 批量保存所有节点 (直接使用 nodeQueries 避免触发 updateStoryMeta)
+            story.nodes.forEach { (nodeId, node) ->
+                nodeQueries.insertNode(
+                    id = node.id,
+                    storyId = story.id,
+                    type = node.type.name,
+                    contentJson = json.encodeToString(node.content),
+                    positionX = node.position.x.toDouble(),
+                    positionY = node.position.y.toDouble(),
+                    connectionsJson = json.encodeToString(node.connections)
+                )
+            }
         }
     }
     
@@ -500,13 +534,18 @@ class StoryRepository(
             id = "battle1",
             type = NodeType.BATTLE,
             content = NodeContent.Battle(
-                enemyId = "goblin",
-                enemyName = "哥布林",
-                enemyStats = CharacterStats(
-                    maxHp = 30,
-                    currentHp = 30,
-                    attack = 8,
-                    defense = 3
+                enemy = Enemy(
+                    id = "goblin",
+                    name = "哥布林",
+                    description = "狡猾的绿皮小怪物",
+                    stats = CharacterStats(
+                        maxHp = 30,
+                        currentHp = 30,
+                        attack = 8,
+                        defense = 3
+                    ),
+                    expReward = 10,
+                    goldReward = 5
                 ),
                 winNextNodeId = "win_ending",
                 loseNextNodeId = "lose_ending"
