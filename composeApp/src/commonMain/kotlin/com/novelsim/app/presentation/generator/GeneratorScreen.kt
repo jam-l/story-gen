@@ -52,7 +52,19 @@ class GeneratorScreenModel(
         onSuccess: (String) -> Unit
     ) {
         screenModelScope.launch {
-            val generator = RandomStoryGenerator(config)
+            // 初始化随机名称生成器
+            val nameProvider = com.novelsim.app.data.source.RandomNameProvider()
+            try {
+                nameProvider.initialize { fileName ->
+                    @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
+                    novelsimulator.composeapp.generated.resources.Res.readBytes("files/$fileName").decodeToString()
+                }
+            } catch (e: Exception) {
+                // 忽略加载错误，使用默认值
+                println("Failed to load name provider: ${e.message}")
+            }
+
+            val generator = RandomStoryGenerator(config, nameProvider)
             val generatedStory = generator.generate(title)
             
             // 强制修复：如果生成器返回空敌人（可能是缓存问题），手动注入默认敌人

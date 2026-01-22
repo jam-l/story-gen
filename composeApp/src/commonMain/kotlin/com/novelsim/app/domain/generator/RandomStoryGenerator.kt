@@ -9,7 +9,8 @@ import kotlin.random.Random
  * 根据配置参数随机生成故事节点和分支
  */
 class RandomStoryGenerator(
-    private val config: GeneratorConfig = GeneratorConfig()
+    private val config: GeneratorConfig = GeneratorConfig(),
+    private val nameProvider: com.novelsim.app.data.source.RandomNameProvider? = null
 ) {
     
     /**
@@ -247,7 +248,10 @@ class RandomStoryGenerator(
     /**
      * 生成随机故事
      */
-    fun generate(title: String = "随机生成的故事"): Story {
+    /**
+     * 生成随机故事
+     */
+    suspend fun generate(title: String = "随机生成的故事"): Story {
         val nodeCount = random.nextInt(config.minNodes, config.maxNodes + 1)
         val choiceCount = random.nextInt(config.minChoices, config.maxChoices + 1)
         val endingCount = if (config.generateEnding) {
@@ -334,15 +338,30 @@ class RandomStoryGenerator(
 
 
 
-    private fun createDialogueNode(id: String, x: Float, y: Float): StoryNode {
+    private suspend fun createDialogueNode(id: String, x: Float, y: Float): StoryNode {
         val templates = dialogueTemplates[config.theme] ?: dialogueTemplates[StoryTheme.FANTASY]!!
         val template = templates[random.nextInt(templates.size)]
+        
+        var speaker = template.first
+        if (speaker != "旁白" && nameProvider != null) {
+            // 50%概率替换为随机名字
+            if (random.nextBoolean()) {
+                speaker = when(config.theme) {
+                    StoryTheme.FANTASY, StoryTheme.MYSTERY, StoryTheme.ROMANCE -> nameProvider.getChineseName()
+                    else -> nameProvider.getEnglishName()
+                }
+                // 偶尔加上称号
+                if (random.nextBoolean()) {
+                    speaker += " (${template.first})"
+                }
+            }
+        }
         
         return StoryNode(
             id = id,
             type = NodeType.DIALOGUE,
             content = NodeContent.Dialogue(
-                speaker = template.first,
+                speaker = speaker,
                 text = template.second,
                 portrait = template.third
             ),
@@ -389,7 +408,7 @@ class RandomStoryGenerator(
         )
     }
     
-    private fun createBattleNode(id: String, x: Float, y: Float): StoryNode {
+    private suspend fun createBattleNode(id: String, x: Float, y: Float): StoryNode {
         // 根据难度计算基础属性
         val baseHp = 50 + (50 * config.difficulty).toInt()
         val baseAtk = 5 + (5 * config.difficulty).toInt()
@@ -410,11 +429,18 @@ class RandomStoryGenerator(
         val availableEnemies = enemyTemplates.take(maxOf(1, maxEnemyIndex + 1))
         val template = availableEnemies[random.nextInt(availableEnemies.size)]
         
-        val (enemyId, enemyName, statsMods) = template
+        val (enemyId, baseName, statsMods) = template
         val (hpMod, atkMod, defVal) = statsMods
         
+        // 生成随机前缀
+        val prefix = if (nameProvider != null && random.nextBoolean()) {
+            nameProvider.getOtherName("武功前缀") // 借用一下前缀
+        } else ""
+        
+        val enemyName = if (prefix.isNotEmpty()) "$prefix$baseName" else baseName
+        
         val enemy = Enemy(
-            id = enemyId,
+            id = "${enemyId}_${id}",
             name = enemyName,
             description = "一个危险的敌人",
             stats = CharacterStats(

@@ -1,0 +1,101 @@
+{
+  "templates": [
+    {
+      "id": "chinese_name_male",
+      "pattern": "{surname}{given}",
+      "description": "中文男名",
+      "parts": {
+        "surname": { "file": "cnname.json", "path": "danxing", "weight": 90 },
+        "given": { "file": "cnname.json", "path": "maleTwo", "weight": 80 }
+      },
+      "variants": [
+        { 
+          "pattern": "{fuxing}{given}", 
+          "weight": 10,
+          "parts": {
+             "fuxing": { "file": "cnname.json", "path": "fuxing" }
+          }
+        },
+        {
+          "pattern": "{surname}{given_three}",
+          "weight": 20,
+          "parts": {
+             "given_three": { "file": "cnname.json", "path": "maleThree" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chinese_name_female",
+      "pattern": "{surname}{given}",
+      "description": "中文女名",
+      "parts": {
+        "surname": { "file": "cnname.json", "path": "danxing" },
+        "given": { "file": "cnname.json", "path": "femaleTwo" }
+      },
+      "variants": [
+         {
+          "pattern": "{surname}{given_three}",
+          "weight": 20,
+          "parts": {
+             "given_three": { "file": "cnname.json", "path": "femaleThree" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "english_name",
+      "pattern": "{name}",
+      "description": "英文名",
+      "parts": {
+        "name": { "file": "enname.json", "path": "enname" }
+      }
+    },
+    {
+      "id": "place_name",
+      "pattern": "{place}",
+      "description": "地名",
+      "parts": {
+        "place": { "file": "diming.json", "path": "cnPlace" }
+      }
+    },
+    {
+      "id": "skill_name",
+      "pattern": "{prefix}{core}{suffix}",
+      "description": "秘籍名称",
+      "parts": {
+        "prefix": { "file": "other.json", "path": "武功前缀", "optional": true, "probability": 0.4 },
+        "core": { "file": "other.json", "path": "武功核心" },
+        "suffix": { "file": "other.json", "path": "武功后缀" }
+      }
+    },
+    {
+      "id": "equipment_sword",
+      "pattern": "{quality}{material}{type}",
+      "description": "宝剑",
+      "parts": {
+        "quality": { "file": "other.json", "path": "品质前缀", "optional": true, "probability": 0.3 },
+        "material": { "file": "other.json", "path": "材质前缀", "optional": true, "probability": 0.5 },
+        "type": { "file": "zhuangbei.json", "path": "剑" }
+      }
+    },
+     {
+      "id": "equipment_blade",
+      "pattern": "{quality}{material}{type}",
+      "description": "宝刀",
+      "parts": {
+        "quality": { "file": "other.json", "path": "品质前缀", "optional": true, "probability": 0.3 },
+        "material": { "file": "other.json", "path": "材质前缀", "optional": true, "probability": 0.5 },
+        "type": { "file": "zhuangbei.json", "path": "刀" }
+      }
+    },
+    {
+      "id": "treasure",
+      "pattern": "{name}",
+      "description": "天材地宝",
+      "parts": {
+        "name": { "file": "other.json", "path": "天材地宝" }
+      }
+    }
+  ]
+}
