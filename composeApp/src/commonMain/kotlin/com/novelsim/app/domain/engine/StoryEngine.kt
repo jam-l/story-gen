@@ -31,7 +31,9 @@ class StoryEngine(
         currentGameState = GameState(
             storyId = storyId,
             currentNodeId = story.startNodeId,
-            variables = story.variables.toMutableMap()
+            variables = story.variables.toMutableMap(),
+            // 初始化自定义物品实例列表
+            itemInstances = story.customItems.associateBy { it.uid }.toMutableMap()
         )
         
         // 加载并缓存故事事件
@@ -257,12 +259,27 @@ class StoryEngine(
             }
             is Effect.GiveItem -> {
                 val inventory = state.inventory.toMutableList()
-                val existingSlot = inventory.find { it.itemId == effect.itemId }
-                if (existingSlot != null) {
-                    val index = inventory.indexOf(existingSlot)
-                    inventory[index] = existingSlot.copy(quantity = existingSlot.quantity + effect.quantity)
+                
+                // 检查是否是自定义物品实例 (effect.itemId 可能是实例ID)
+                val instance = state.itemInstances[effect.itemId]
+                
+                if (instance != null) {
+                    // 自定义物品: 不可堆叠，直接添加新槽位
+                    // InventorySlot.itemId 存模板ID, instanceId 存实例ID
+                    inventory.add(InventorySlot(
+                        itemId = instance.templateId,
+                        quantity = 1,
+                        instanceId = instance.uid
+                    ))
                 } else {
-                    inventory.add(InventorySlot(effect.itemId, effect.quantity))
+                    // 普通物品: 尝试堆叠
+                    val existingSlot = inventory.find { it.itemId == effect.itemId && it.instanceId == null }
+                    if (existingSlot != null) {
+                        val index = inventory.indexOf(existingSlot)
+                        inventory[index] = existingSlot.copy(quantity = existingSlot.quantity + effect.quantity)
+                    } else {
+                        inventory.add(InventorySlot(effect.itemId, effect.quantity))
+                    }
                 }
                 currentGameState = state.copy(inventory = inventory)
             }
@@ -355,5 +372,176 @@ class StoryEngine(
         currentGameState = currentGameState?.copy(
             playTime = (currentGameState?.playTime ?: 0L) + deltaMs
         )
+    }
+
+    /**
+     * 使用物品
+     */
+    fun useItem(slot: InventorySlot): Result<Unit> {
+        val state = currentGameState ?: return Result.failure(Exception("State not initialized"))
+        val story = currentStory ?: return Result.failure(Exception("Story not loaded"))
+        
+        // 查找模板 (可能是实例也可能是普通物品，itemId都存的是模板ID)
+        val template = story.items.find { it.id == slot.itemId }
+            ?: return Result.failure(Exception("Item template not found: ${slot.itemId}"))
+            
+        if (template.type != ItemType.CONSUMABLE) {
+            return Result.failure(Exception("Item is not consumable"))
+        }
+        
+        // 应用效果
+        template.effect?.let { effect ->
+            // 如果是效果类，这里需要适配 ApplyEffect 逻辑
+            // ItemEffect 与 Effect 不同，需要转换或单独处理
+            applyItemEffect(effect, null) // Consumables typically don't have instance stats
+        }
+        
+        // 移除物品
+        return removeItem(slot, 1)
+    }
+    
+    /**
+     * 装备物品
+     */
+    fun equipItem(slot: InventorySlot): Result<Unit> {
+        val state = currentGameState ?: return Result.failure(Exception("State not initialized"))
+        val story = currentStory ?: return Result.failure(Exception("Story not loaded"))
+        
+        val template = story.items.find { it.id == slot.itemId }
+            ?: return Result.failure(Exception("Item template not found"))
+            
+        if (template.type != ItemType.EQUIPMENT) {
+            return Result.failure(Exception("Item is not equipment"))
+        }
+        
+        val effect = template.effect as? ItemEffect.EquipmentBonus
+            ?: return Result.failure(Exception("Item has no equipment effect"))
+            
+        // 1. 卸下当前位置的装备
+        val currentEquippedId = when (effect.slot) {
+            EquipSlot.WEAPON -> state.equipment.weapon
+            EquipSlot.ARMOR -> state.equipment.armor
+            EquipSlot.HEAD -> state.equipment.head
+            EquipSlot.ACCESSORY -> state.equipment.accessory
+            EquipSlot.BOOTS -> state.equipment.boots
+        }
+        
+        if (currentEquippedId != null) {
+            unequipItem(effect.slot)
+        }
+        
+        // 2. 装备新物品 (保存 InstanceId 或 ItemId)
+        // 如果 InventorySlot 只有 ItemId (普通装备)，就用 ItemId
+        // 如果有 InstanceId (随机装备)，就用 InstanceId
+        val equipId = slot.instanceId ?: slot.itemId
+        
+        val newEquipment = when (effect.slot) {
+            EquipSlot.WEAPON -> state.equipment.copy(weapon = equipId)
+            EquipSlot.ARMOR -> state.equipment.copy(armor = equipId)
+            EquipSlot.HEAD -> state.equipment.copy(head = equipId)
+            EquipSlot.ACCESSORY -> state.equipment.copy(accessory = equipId)
+            EquipSlot.BOOTS -> state.equipment.copy(boots = equipId)
+        }
+        
+        currentGameState = state.copy(equipment = newEquipment)
+        
+        // 3. 移除背包中的物品
+        removeItem(slot, 1)
+        
+        // 4. 应用被动属性 (可选，如果属性是预计算在 CharacterStats 里的。这里暂不处理，
+        // 假设 BattleSystem 会根据 GameState 动态计算 TotalStats)
+        
+        return Result.success(Unit)
+    }
+    
+    /**
+     * 卸下物品
+     */
+    fun unequipItem(slot: EquipSlot): Result<Unit> {
+        val state = currentGameState ?: return Result.failure(Exception("State not initialized"))
+        
+        val equipId = when (slot) {
+            EquipSlot.WEAPON -> state.equipment.weapon
+            EquipSlot.ARMOR -> state.equipment.armor
+            EquipSlot.HEAD -> state.equipment.head
+            EquipSlot.ACCESSORY -> state.equipment.accessory
+            EquipSlot.BOOTS -> state.equipment.boots
+        } ?: return Result.success(Unit) // 已经是空的
+        
+        // 检查这个ID是实例还是模板
+        val instance = state.itemInstances[equipId]
+        
+        // 添加回背包
+        val inventory = state.inventory.toMutableList()
+        if (instance != null) {
+            // 是实例
+            inventory.add(InventorySlot(instance.templateId, 1, instance.uid))
+        } else {
+            // 是普通物品，尝试堆叠
+            val existing = inventory.find { it.itemId == equipId && it.instanceId == null }
+            if (existing != null) {
+                val index = inventory.indexOf(existing)
+                inventory[index] = existing.copy(quantity = existing.quantity + 1)
+            } else {
+                inventory.add(InventorySlot(equipId, 1))
+            }
+        }
+        
+        // 清空装备栏
+        val newEquipment = when (slot) {
+            EquipSlot.WEAPON -> state.equipment.copy(weapon = null)
+            EquipSlot.ARMOR -> state.equipment.copy(armor = null)
+            EquipSlot.HEAD -> state.equipment.copy(head = null)
+            EquipSlot.ACCESSORY -> state.equipment.copy(accessory = null)
+            EquipSlot.BOOTS -> state.equipment.copy(boots = null)
+        }
+        
+        currentGameState = state.copy(
+            inventory = inventory,
+            equipment = newEquipment
+        )
+        
+        return Result.success(Unit)
+    }
+    
+    private fun removeItem(slot: InventorySlot, amount: Int): Result<Unit> {
+        val state = currentGameState ?: return Result.failure(Exception("State error"))
+        val inventory = state.inventory.toMutableList()
+        
+        val index = inventory.indexOf(slot) // 需要精确匹配对象引用或equals
+        // 由于 InventorySlot 是 data class，只要内容一样就 equals
+        // 这里的 slot 应该来自 UI，是完全匹配的
+        
+        // 如果 UI 传递的 slot 状态可能过时，最好用 id 查找
+        val foundIndex = inventory.indexOfFirst { 
+            it.itemId == slot.itemId && it.instanceId == slot.instanceId && it.quantity == slot.quantity 
+        }
+        
+        if (foundIndex != -1) {
+            val currentSlot = inventory[foundIndex]
+            if (currentSlot.quantity > amount) {
+                inventory[foundIndex] = currentSlot.copy(quantity = currentSlot.quantity - amount)
+            } else {
+                inventory.removeAt(foundIndex)
+            }
+            currentGameState = state.copy(inventory = inventory)
+            return Result.success(Unit)
+        }
+        return Result.failure(Exception("Item not found"))
+    }
+    
+    // 处理 ItemEffect (Heal, etc)
+    private fun applyItemEffect(effect: ItemEffect, instance: ItemInstance?) {
+         val state = currentGameState ?: return
+         // 简单实现 Heal
+         if (effect is ItemEffect.Heal) {
+             val stats = state.playerStats
+             val newStats = stats.copy(
+                 currentHp = (stats.currentHp + effect.hp).coerceIn(0, stats.maxHp),
+                 currentMp = (stats.currentMp + effect.mp).coerceIn(0, stats.maxMp)
+             )
+             currentGameState = state.copy(playerStats = newStats)
+         }
+         // EquipmentBonus 不在这里处理，而是在 BattleSystem 计算属性时处理
     }
 }

@@ -103,16 +103,48 @@ data class Item(
 )
 
 /**
+ * 道具稀有度
+ */
+enum class ItemRarity {
+    COMMON,     // 普通
+    UNCOMMON,   // 优秀
+    RARE,       // 稀有
+    EPIC,       // 史诗
+    LEGENDARY,  // 传说
+    MYTHIC      // 神话
+}
+
+/**
+ * 道具实例 - 也就是背包里的具体物品（用于支持随机属性）
+ */
+@Serializable
+data class ItemInstance(
+    val uid: String,            // 唯一ID (UUID)
+    val templateId: String,     // 模板ID (关联 Item.id)
+    val name: String,           // 显示名称 (如: "狂暴的铁剑")
+    val level: Int = 1,         // 物品等级
+    val rarity: ItemRarity = ItemRarity.COMMON,
+    // 额外的属性加成 (叠加在模板基础属性上)
+    val bonusAttack: Int = 0,
+    val bonusDefense: Int = 0,
+    val bonusHp: Int = 0,
+    val bonusMp: Int = 0,
+    val bonusSpeed: Int = 0,
+    val creationTime: Long = 0L
+)
+
+/**
  * 背包槽位
  */
 @Serializable
 data class InventorySlot(
     val itemId: String,
-    val quantity: Int
+    val quantity: Int,
+    val instanceId: String? = null // 如果是不可堆叠的物品(装备)，这里存储实例ID
 )
 
 /**
- * 装备栏
+ * 装备栏 (存储的是 instanceId)
  */
 @Serializable
 data class Equipment(
@@ -199,6 +231,8 @@ data class GameState(
     val currentNodeId: String,
     val playerStats: CharacterStats = CharacterStats(),
     val inventory: List<InventorySlot> = emptyList(),
+    // 存储所有具体的物品实例，key = instanceUid
+    val itemInstances: MutableMap<String, ItemInstance> = mutableMapOf(),
     val equipment: Equipment = Equipment(),
     val variables: MutableMap<String, String> = mutableMapOf(),
     val gold: Int = 0,

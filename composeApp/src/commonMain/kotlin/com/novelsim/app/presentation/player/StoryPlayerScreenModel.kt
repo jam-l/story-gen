@@ -376,4 +376,28 @@ class StoryPlayerScreenModel(
             showHistory = !_uiState.value.showHistory
         )
     }
+
+    fun useItem(slot: InventorySlot) {
+        storyEngine.useItem(slot).onSuccess {
+            _uiState.value = _uiState.value.copy(
+                gameState = storyEngine.getGameState()
+            )
+        }
+    }
+
+    fun equipItem(slot: InventorySlot) {
+        storyEngine.equipItem(slot).onSuccess {
+            _uiState.value = _uiState.value.copy(
+                gameState = storyEngine.getGameState()
+            )
+        }
+    }
+
+    fun unequipItem(slot: EquipSlot) {
+        storyEngine.unequipItem(slot).onSuccess {
+            _uiState.value = _uiState.value.copy(
+                gameState = storyEngine.getGameState()
+            )
+        }
+    }
 }

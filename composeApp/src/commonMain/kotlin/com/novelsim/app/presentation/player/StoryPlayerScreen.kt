@@ -100,6 +100,21 @@ data class StoryPlayerScreen(
                 )
             }
             
+            // 背包界面
+            if (uiState.showInventory) {
+                InventoryScreen(
+                    inventory = uiState.gameState?.inventory ?: emptyList(),
+                    itemInstances = uiState.gameState?.itemInstances ?: emptyMap(),
+                    equipment = uiState.gameState?.equipment ?: Equipment(),
+                    items = uiState.story?.items ?: emptyList(),
+                    gold = uiState.gameState?.gold ?: 0,
+                    onUseItem = { screenModel.useItem(it) },
+                    onEquipItem = { screenModel.equipItem(it) },
+                    onUnequipItem = { screenModel.unequipItem(it) },
+                    onDismiss = { screenModel.toggleInventory() }
+                )
+            }
+            
             // 状态面板
             if (uiState.showStatus) {
                 StatusPanel(

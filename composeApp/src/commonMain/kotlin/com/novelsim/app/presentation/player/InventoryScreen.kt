@@ -28,11 +28,12 @@ import com.novelsim.app.data.model.*
 @Composable
 fun InventoryScreen(
     inventory: List<InventorySlot>,
+    itemInstances: Map<String, ItemInstance> = emptyMap(),
     equipment: Equipment,
     items: List<Item>,
     gold: Int,
-    onUseItem: (Item) -> Unit,
-    onEquipItem: (Item) -> Unit,
+    onUseItem: (InventorySlot) -> Unit,
+    onEquipItem: (InventorySlot) -> Unit,
     onUnequipItem: (EquipSlot) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -69,12 +70,14 @@ fun InventoryScreen(
             when (selectedTab) {
                 0 -> InventoryGrid(
                     inventory = inventory,
+                    itemInstances = itemInstances,
                     items = items,
                     onUseItem = onUseItem,
                     onEquipItem = onEquipItem
                 )
                 1 -> EquipmentPanel(
                     equipment = equipment,
+                    itemInstances = itemInstances,
                     items = items,
                     onUnequip = onUnequipItem
                 )
@@ -136,11 +139,11 @@ private fun InventoryTopBar(
 @Composable
 private fun InventoryGrid(
     inventory: List<InventorySlot>,
+    itemInstances: Map<String, ItemInstance>,
     items: List<Item>,
-    onUseItem: (Item) -> Unit,
-    onEquipItem: (Item) -> Unit
+    onUseItem: (InventorySlot) -> Unit,
+    onEquipItem: (InventorySlot) -> Unit
 ) {
-    var selectedItem by remember { mutableStateOf<Item?>(null) }
     var selectedSlot by remember { mutableStateOf<InventorySlot?>(null) }
     
     if (inventory.isEmpty()) {
@@ -170,16 +173,29 @@ private fun InventoryGrid(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(inventory) { slot ->
-                val item = items.find { it.id == slot.itemId }
-                if (item != null) {
+                // 解析显示数据
+                val instance = itemInstances[slot.instanceId]
+                // 如果是实例，itemId是模板ID；如果是普通物品，itemId也是模板ID
+                val templateId = instance?.templateId ?: slot.itemId
+                val template = items.find { it.id == templateId }
+                
+                if (template != null) {
+                    val displayName = instance?.name ?: template.name
+                    val rarity = instance?.rarity ?: ItemRarity.COMMON
+                    
                     ItemSlot(
-                        item = item,
+                        name = displayName,
+                        icon = when (template.type) {
+                            ItemType.CONSUMABLE -> Icons.Default.Favorite
+                            ItemType.EQUIPMENT -> Icons.Default.Build
+                            ItemType.KEY_ITEM -> Icons.Default.Lock
+                            ItemType.MATERIAL -> Icons.Default.Settings
+                        },
+                        type = template.type,
+                        rarity = rarity,
                         quantity = slot.quantity,
-                        isSelected = selectedItem?.id == item.id,
-                        onClick = {
-                            selectedItem = item
-                            selectedSlot = slot
-                        }
+                        isSelected = selectedSlot == slot,
+                        onClick = { selectedSlot = slot }
                     )
                 }
             }
@@ -187,38 +203,43 @@ private fun InventoryGrid(
     }
     
     // 道具详情对话框
-    selectedItem?.let { item ->
-        ItemDetailDialog(
-            item = item,
-            quantity = selectedSlot?.quantity ?: 0,
-            onUse = {
-                onUseItem(item)
-                selectedItem = null
-            },
-            onEquip = {
-                onEquipItem(item)
-                selectedItem = null
-            },
-            onDismiss = { selectedItem = null }
-        )
+    selectedSlot?.let { slot ->
+        val instance = itemInstances[slot.instanceId]
+        val templateId = instance?.templateId ?: slot.itemId
+        val template = items.find { it.id == templateId }
+        
+        if (template != null) {
+            ItemDetailDialog(
+                template = template,
+                instance = instance,
+                quantity = slot.quantity,
+                onUse = {
+                    onUseItem(slot)
+                    selectedSlot = null
+                },
+                onEquip = {
+                    onEquipItem(slot)
+                    selectedSlot = null
+                },
+                onDismiss = { selectedSlot = null }
+            )
+        }
     }
 }
 
 @Composable
 private fun ItemSlot(
-    item: Item,
+    name: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    type: ItemType,
+    rarity: ItemRarity,
     quantity: Int,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val backgroundColor = when (item.type) {
-        ItemType.CONSUMABLE -> Color(0xFF4CAF50).copy(alpha = 0.2f)
-        ItemType.EQUIPMENT -> Color(0xFF2196F3).copy(alpha = 0.2f)
-        ItemType.KEY_ITEM -> Color(0xFFFF9800).copy(alpha = 0.2f)
-        ItemType.MATERIAL -> Color(0xFF9E9E9E).copy(alpha = 0.2f)
-    }
-    
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val rarityColor = getRarityColor(rarity)
+    val backgroundColor = rarityColor.copy(alpha = 0.1f)
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else rarityColor.copy(alpha = 0.5f)
     
     Card(
         modifier = Modifier
@@ -226,7 +247,7 @@ private fun ItemSlot(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        border = if (isSelected) CardDefaults.outlinedCardBorder() else null
+        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -237,26 +258,21 @@ private fun ItemSlot(
                 modifier = Modifier.padding(4.dp)
             ) {
                 Icon(
-                    imageVector = when (item.type) {
-                        ItemType.CONSUMABLE -> Icons.Default.Favorite
-                        ItemType.EQUIPMENT -> Icons.Default.Build
-                        ItemType.KEY_ITEM -> Icons.Default.Lock
-                        ItemType.MATERIAL -> Icons.Default.Settings
-                    },
+                    imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = getRarityColor(rarity) // 图标使用稀有度颜色
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = item.name,
+                    text = name,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            
-            // 数量标签
+            // Quantity label ... same
             if (quantity > 1) {
                 Surface(
                     modifier = Modifier
@@ -279,72 +295,102 @@ private fun ItemSlot(
 
 @Composable
 private fun ItemDetailDialog(
-    item: Item,
+    template: Item,
+    instance: ItemInstance?,
     quantity: Int,
     onUse: () -> Unit,
     onEquip: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val displayName = instance?.name ?: template.name
+    val displayDesc = instance?.let { "Lv.${it.level} ${it.rarity.name}" } ?: template.description
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(item.name)
+                Text(displayName)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "x$quantity",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // 稀有度标签
+                if (instance != null) {
+                    Surface(
+                        color = getRarityColor(instance.rarity),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = instance.rarity.name.take(1),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+                }
             }
         },
         text = {
             Column {
-                Text(item.description)
+                Text(template.description) // 始终显示基础描述
+                if (instance != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("等级: ${instance.level}", style = MaterialTheme.typography.bodySmall)
+                }
+                
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // 显示效果
-                when (val effect = item.effect) {
+                // 显示效果 (合并基础效果 + 实例加成)
+                when (val effect = template.effect) {
                     is ItemEffect.Heal -> {
                         if (effect.hp > 0) Text("恢复 HP: +${effect.hp}")
                         if (effect.mp > 0) Text("恢复 MP: +${effect.mp}")
                     }
                     is ItemEffect.EquipmentBonus -> {
                         Text("装备位置: ${effect.slot.name}")
-                        if (effect.attackBonus != 0) Text("攻击力: +${effect.attackBonus}")
-                        if (effect.defenseBonus != 0) Text("防御力: +${effect.defenseBonus}")
-                        if (effect.hpBonus != 0) Text("HP: +${effect.hpBonus}")
+                        
+                        // 计算总属性
+                        val atk = effect.attackBonus + (instance?.bonusAttack ?: 0)
+                        val def = effect.defenseBonus + (instance?.bonusDefense ?: 0)
+                        val hp = effect.hpBonus + (instance?.bonusHp ?: 0)
+                        
+                        if (atk != 0) Text("攻击力: +$atk ${if((instance?.bonusAttack ?: 0) > 0) "(强化 +${instance?.bonusAttack})" else ""}")
+                        if (def != 0) Text("防御力: +$def ${if((instance?.bonusDefense ?: 0) > 0) "(强化 +${instance?.bonusDefense})" else ""}")
+                        if (hp != 0)  Text("HP上限: +$hp")
                     }
                     else -> {}
                 }
             }
         },
         confirmButton = {
-            when (item.type) {
+            when (template.type) {
                 ItemType.CONSUMABLE -> {
-                    Button(onClick = onUse) {
-                        Text("使用")
-                    }
+                    Button(onClick = onUse) { Text("使用") }
                 }
                 ItemType.EQUIPMENT -> {
-                    Button(onClick = onEquip) {
-                        Text("装备")
-                    }
+                    Button(onClick = onEquip) { Text("装备") }
                 }
                 else -> {}
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
+            TextButton(onClick = onDismiss) { Text("关闭") }
         }
     )
+}
+
+private fun getRarityColor(rarity: ItemRarity): Color {
+    return when (rarity) {
+        ItemRarity.COMMON -> Color(0xFF9E9E9E)     // Grey
+        ItemRarity.UNCOMMON -> Color(0xFF4CAF50)   // Green
+        ItemRarity.RARE -> Color(0xFF2196F3)       // Blue
+        ItemRarity.EPIC -> Color(0xFF9C27B0)       // Purple
+        ItemRarity.LEGENDARY -> Color(0xFFFF9800)  // Orange
+        ItemRarity.MYTHIC -> Color(0xFFFF5252)     // Red
+    }
 }
 
 @Composable
 private fun EquipmentPanel(
     equipment: Equipment,
+    itemInstances: Map<String, ItemInstance>,
     items: List<Item>,
     onUnequip: (EquipSlot) -> Unit
 ) {
@@ -360,11 +406,16 @@ private fun EquipmentPanel(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(slots) { (slot, itemId) ->
-            val item = items.find { it.id == itemId }
+        items(slots) { (slot, instanceId) ->
+            // instanceId might be a template ID (old) or an instance ID (new)
+            val instance = itemInstances[instanceId]
+            val templateId = instance?.templateId ?: instanceId
+            val item = items.find { it.id == templateId }
+            
             EquipmentSlotCard(
                 slot = slot,
-                item = item,
+                template = item,
+                instance = instance,
                 onUnequip = { onUnequip(slot) }
             )
         }
@@ -374,7 +425,8 @@ private fun EquipmentPanel(
 @Composable
 private fun EquipmentSlotCard(
     slot: EquipSlot,
-    item: Item?,
+    template: Item?,
+    instance: ItemInstance?,
     onUnequip: () -> Unit
 ) {
     val slotName = when (slot) {
@@ -393,9 +445,15 @@ private fun EquipmentSlotCard(
         EquipSlot.BOOTS -> Icons.Default.PlayArrow
     }
     
+    val displayName = instance?.name ?: template?.name ?: "空"
+    val isEquipped = template != null
+    val rarity = instance?.rarity ?: ItemRarity.COMMON
+    val borderColor = if (isEquipped) getRarityColor(rarity).copy(alpha = 0.5f) else Color.Transparent
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        border = if (isEquipped) androidx.compose.foundation.BorderStroke(1.dp, borderColor) else null
     ) {
         Row(
             modifier = Modifier
@@ -409,7 +467,7 @@ private fun EquipmentSlotCard(
                     .size(48.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(
-                        if (item != null) MaterialTheme.colorScheme.primaryContainer
+                        if (isEquipped) getRarityColor(rarity).copy(alpha = 0.2f)
                         else MaterialTheme.colorScheme.surfaceVariant
                     ),
                 contentAlignment = Alignment.Center
@@ -417,8 +475,8 @@ private fun EquipmentSlotCard(
                 Icon(
                     imageVector = slotIcon,
                     contentDescription = null,
-                    tint = if (item != null) 
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = if (isEquipped) 
+                        getRarityColor(rarity)
                     else 
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -434,19 +492,27 @@ private fun EquipmentSlotCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = item?.name ?: "空",
+                    text = displayName,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (item != null) FontWeight.Bold else FontWeight.Normal
+                    fontWeight = if (isEquipped) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isEquipped) getRarityColor(rarity) else Color.Unspecified
                 )
                 
                 // 显示装备加成
-                if (item != null) {
-                    val effect = item.effect as? ItemEffect.EquipmentBonus
+                if (template != null) {
+                    val effect = template.effect as? ItemEffect.EquipmentBonus
                     effect?.let {
                         val bonuses = mutableListOf<String>()
-                        if (it.attackBonus != 0) bonuses.add("攻+${it.attackBonus}")
-                        if (it.defenseBonus != 0) bonuses.add("防+${it.defenseBonus}")
-                        if (it.hpBonus != 0) bonuses.add("HP+${it.hpBonus}")
+                        
+                        // 合并属性
+                        val atk = it.attackBonus + (instance?.bonusAttack ?: 0)
+                        val def = it.defenseBonus + (instance?.bonusDefense ?: 0)
+                        val hp = it.hpBonus + (instance?.bonusHp ?: 0)
+                        
+                        if (atk != 0) bonuses.add("攻+${atk}")
+                        if (def != 0) bonuses.add("防+${def}")
+                        if (hp != 0) bonuses.add("HP+${hp}")
+                        
                         if (bonuses.isNotEmpty()) {
                             Text(
                                 text = bonuses.joinToString(" "),
@@ -459,7 +525,7 @@ private fun EquipmentSlotCard(
             }
             
             // 卸下按钮
-            if (item != null) {
+            if (isEquipped) {
                 IconButton(onClick = onUnequip) {
                     Icon(
                         Icons.Default.Clear,

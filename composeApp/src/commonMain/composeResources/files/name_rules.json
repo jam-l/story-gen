@@ -5,22 +5,36 @@
       "pattern": "{surname}{given}",
       "description": "中文男名",
       "parts": {
-        "surname": { "file": "cnname.json", "path": "danxing", "weight": 90 },
-        "given": { "file": "cnname.json", "path": "maleTwo", "weight": 80 }
+        "surname": {
+          "file": "cnname.json",
+          "path": "danxing",
+          "weight": 90
+        },
+        "given": {
+          "file": "cnname.json",
+          "path": "maleTwo",
+          "weight": 80
+        }
       },
       "variants": [
-        { 
-          "pattern": "{fuxing}{given}", 
+        {
+          "pattern": "{fuxing}{given}",
           "weight": 10,
           "parts": {
-             "fuxing": { "file": "cnname.json", "path": "fuxing" }
+            "fuxing": {
+              "file": "cnname.json",
+              "path": "fuxing"
+            }
           }
         },
         {
           "pattern": "{surname}{given_three}",
           "weight": 20,
           "parts": {
-             "given_three": { "file": "cnname.json", "path": "maleThree" }
+            "given_three": {
+              "file": "cnname.json",
+              "path": "maleThree"
+            }
           }
         }
       ]
@@ -30,15 +44,24 @@
       "pattern": "{surname}{given}",
       "description": "中文女名",
       "parts": {
-        "surname": { "file": "cnname.json", "path": "danxing" },
-        "given": { "file": "cnname.json", "path": "femaleTwo" }
+        "surname": {
+          "file": "cnname.json",
+          "path": "danxing"
+        },
+        "given": {
+          "file": "cnname.json",
+          "path": "femaleTwo"
+        }
       },
       "variants": [
-         {
+        {
           "pattern": "{surname}{given_three}",
           "weight": 20,
           "parts": {
-             "given_three": { "file": "cnname.json", "path": "femaleThree" }
+            "given_three": {
+              "file": "cnname.json",
+              "path": "femaleThree"
+            }
           }
         }
       ]
@@ -48,7 +71,10 @@
       "pattern": "{name}",
       "description": "英文名",
       "parts": {
-        "name": { "file": "enname.json", "path": "enname" }
+        "name": {
+          "file": "enname.json",
+          "path": "enname"
+        }
       }
     },
     {
@@ -56,7 +82,10 @@
       "pattern": "{place}",
       "description": "地名",
       "parts": {
-        "place": { "file": "diming.json", "path": "cnPlace" }
+        "place": {
+          "file": "diming.json",
+          "path": "cnPlace"
+        }
       }
     },
     {
@@ -64,9 +93,20 @@
       "pattern": "{prefix}{core}{suffix}",
       "description": "秘籍名称",
       "parts": {
-        "prefix": { "file": "other.json", "path": "武功前缀", "optional": true, "probability": 0.4 },
-        "core": { "file": "other.json", "path": "武功核心" },
-        "suffix": { "file": "other.json", "path": "武功后缀" }
+        "prefix": {
+          "file": "other.json",
+          "path": "武功前缀",
+          "optional": true,
+          "probability": 0.4
+        },
+        "core": {
+          "file": "other.json",
+          "path": "武功核心"
+        },
+        "suffix": {
+          "file": "other.json",
+          "path": "武功后缀"
+        }
       }
     },
     {
@@ -74,19 +114,45 @@
       "pattern": "{quality}{material}{type}",
       "description": "宝剑",
       "parts": {
-        "quality": { "file": "other.json", "path": "品质前缀", "optional": true, "probability": 0.3 },
-        "material": { "file": "other.json", "path": "材质前缀", "optional": true, "probability": 0.5 },
-        "type": { "file": "zhuangbei.json", "path": "剑" }
+        "quality": {
+          "file": "other.json",
+          "path": "品质前缀",
+          "optional": true,
+          "probability": 0.3
+        },
+        "material": {
+          "file": "other.json",
+          "path": "材质前缀",
+          "optional": true,
+          "probability": 0.5
+        },
+        "type": {
+          "file": "zhuangbei.json",
+          "path": "剑"
+        }
       }
     },
-     {
+    {
       "id": "equipment_blade",
       "pattern": "{quality}{material}{type}",
       "description": "宝刀",
       "parts": {
-        "quality": { "file": "other.json", "path": "品质前缀", "optional": true, "probability": 0.3 },
-        "material": { "file": "other.json", "path": "材质前缀", "optional": true, "probability": 0.5 },
-        "type": { "file": "zhuangbei.json", "path": "刀" }
+        "quality": {
+          "file": "other.json",
+          "path": "品质前缀",
+          "optional": true,
+          "probability": 0.3
+        },
+        "material": {
+          "file": "other.json",
+          "path": "材质前缀",
+          "optional": true,
+          "probability": 0.5
+        },
+        "type": {
+          "file": "zhuangbei.json",
+          "path": "刀"
+        }
       }
     },
     {
@@ -94,7 +160,37 @@
       "pattern": "{name}",
       "description": "天材地宝",
       "parts": {
-        "name": { "file": "other.json", "path": "天材地宝" }
+        "name": {
+          "file": "other.json",
+          "path": "天材地宝"
+        }
+      }
+    },
+    {
+      "id": "monster_beast",
+      "pattern": "{part1}{part2}{part3}{part4}",
+      "description": "仙禽异兽",
+      "parts": {
+        "part1": {
+          "file": "other.json",
+          "path": "仙禽异兽.list2",
+          "optional": true,
+          "probability": 0.5
+        },
+        "part2": {
+          "file": "other.json",
+          "path": "仙禽异兽.list3",
+          "optional": true,
+          "probability": 0.5
+        },
+        "part3": {
+          "file": "other.json",
+          "path": "仙禽异兽"
+        },
+        "part4": {
+          "file": "other.json",
+          "path": "仙禽异兽.list4"
+        }
       }
     }
   ]

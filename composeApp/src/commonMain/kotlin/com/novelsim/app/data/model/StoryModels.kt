@@ -255,7 +255,8 @@ data class Story(
     val items: List<Item> = emptyList(),
     val enemies: List<Enemy> = emptyList(),
     val createdAt: Long = 0L,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val customItems: List<ItemInstance> = emptyList()
 )
 
 /**
@@ -333,6 +334,7 @@ data class StoryPackage(
     val locations: List<Location> = emptyList(),
     val events: List<GameEvent> = emptyList(),
     val clues: List<Clue> = emptyList(),
-    val factions: List<Faction> = emptyList()
+    val factions: List<Faction> = emptyList(),
+    val customItems: List<ItemInstance> = emptyList()
 )
 

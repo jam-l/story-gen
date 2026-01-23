@@ -229,9 +229,14 @@ class RandomNameProvider(
                         for (item in value) {
                             if (item is kotlinx.serialization.json.JsonObject) {
                                 val categoryName = item["name"]?.toString()?.trim('"') ?: "unknown"
-                                val subList = item["list"]
-                                if (subList != null) {
-                                    flattenJson(subList, categoryName, result) // 直接用分类名作为 Key 存入顶层
+                                
+                                // 遍历所有以 list 开头的 key
+                                for ((subKey, subValue) in item) {
+                                    if (subKey == "list") {
+                                        flattenJson(subValue, categoryName, result)
+                                    } else if (subKey.startsWith("list")) {
+                                        flattenJson(subValue, "$categoryName.$subKey", result)
+                                    }
                                 }
                             }
                         }

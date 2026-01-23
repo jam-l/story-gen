@@ -262,6 +262,7 @@ class RandomStoryGenerator(
         
         val nodes = mutableMapOf<String, StoryNode>()
         val nodeIds = mutableListOf<String>()
+        val customItems = mutableListOf<ItemInstance>()
         
         // 1. 创建开始节点
         val startNode = createDialogueNode("start", 100f, 100f)
@@ -289,7 +290,7 @@ class RandomStoryGenerator(
             val node = when (nodeType) {
                 NodeType.BATTLE -> createBattleNode(nodeId, currentX, currentY)
                 NodeType.CONDITION -> createConditionNode(nodeId, currentX, currentY)
-                NodeType.ITEM -> createItemNode(nodeId, currentX, currentY)
+                NodeType.ITEM -> createItemNode(nodeId, currentX, currentY, customItems)
                 NodeType.VARIABLE -> createVariableNode(nodeId, currentX, currentY)
                 else -> createDialogueNode(nodeId, currentX, currentY)
             }
@@ -332,7 +333,8 @@ class RandomStoryGenerator(
             startNodeId = "start",
             nodes = nodes,
             createdAt = PlatformUtils.getCurrentTimeMillis(),
-            updatedAt = PlatformUtils.getCurrentTimeMillis()
+            updatedAt = PlatformUtils.getCurrentTimeMillis(),
+            customItems = customItems
         )
     }
 
@@ -432,12 +434,8 @@ class RandomStoryGenerator(
         val (enemyId, baseName, statsMods) = template
         val (hpMod, atkMod, defVal) = statsMods
         
-        // 生成随机前缀
-        val prefix = if (nameProvider != null && random.nextBoolean()) {
-            nameProvider.getOtherName("武功前缀") // 借用一下前缀
-        } else ""
         
-        val enemyName = if (prefix.isNotEmpty()) "$prefix$baseName" else baseName
+        val enemyName = nameProvider?.generate("monster_beast") ?: baseName
         
         val enemy = Enemy(
             id = "${enemyId}_${id}",
@@ -490,7 +488,26 @@ class RandomStoryGenerator(
         )
     }
     
-    private fun createItemNode(id: String, x: Float, y: Float): StoryNode {
+    private suspend fun createItemNode(id: String, x: Float, y: Float, customItems: MutableList<ItemInstance>): StoryNode {
+        // 30% 概率获得随机生成的装备 (且必须有 nameProvider)
+        if (nameProvider != null && random.nextFloat() < 0.3f) {
+            val equipmentInstance = createRandomEquipment(id)
+            customItems.add(equipmentInstance)
+            
+            return StoryNode(
+                id = id,
+                type = NodeType.ITEM,
+                content = NodeContent.ItemAction(
+                    itemId = equipmentInstance.uid, // 使用实例ID
+                    itemName = equipmentInstance.name,
+                    quantity = 1,
+                    action = ItemActionType.GIVE,
+                    nextNodeId = ""
+                ),
+                position = NodePosition(x, y)
+            )
+        }
+    
         val items = listOf("potion_hp", "key_gold", "sword_iron", "scroll_magic")
         val actions = ItemActionType.entries
         // 难度越高，获得的数量可能越少
@@ -506,6 +523,53 @@ class RandomStoryGenerator(
                 nextNodeId = ""
             ),
             position = NodePosition(x, y)
+        )
+    }
+
+    private suspend fun createRandomEquipment(nodeId: String): ItemInstance {
+        // 随机选择类型
+        val types = listOf("sword", "blade") // 目前 rules.json 只有这两种的生成逻辑
+        val type = types.random(random)
+        val templateId = "weapon_$type" // 假设基础模板ID
+        
+        // 生成名字
+        val customName = nameProvider!!.getEquipmentName(type)
+        
+        // 生成属性
+        val level = random.nextInt(1, (10 * config.difficulty).toInt() + 2)
+        // 稀有度
+        val rarityRoll = random.nextFloat()
+        val rarity = when {
+            rarityRoll < 0.6 -> ItemRarity.COMMON
+            rarityRoll < 0.85 -> ItemRarity.UNCOMMON
+            rarityRoll < 0.95 -> ItemRarity.RARE
+            rarityRoll < 0.99 -> ItemRarity.EPIC
+            else -> ItemRarity.LEGENDARY
+        }
+        
+        // 属性加成计算 (简单的线性成长 + 稀有度倍率)
+        val rarityMultiplier = when(rarity) {
+            ItemRarity.COMMON -> 1.0f
+            ItemRarity.UNCOMMON -> 1.5f
+            ItemRarity.RARE -> 2.5f
+            ItemRarity.EPIC -> 4.0f
+            ItemRarity.LEGENDARY -> 6.0f
+            ItemRarity.MYTHIC -> 10.0f
+        }
+        
+        val baseStat = (level * 2 * rarityMultiplier).toInt()
+        val atk = baseStat + random.nextInt(level)
+        val def = if (random.nextBoolean()) (baseStat * 0.5).toInt() else 0
+        
+        return ItemInstance(
+            uid = "inst_${PlatformUtils.getCurrentTimeMillis()}_${random.nextInt(10000)}",
+            templateId = templateId,
+            name = customName,
+            level = level,
+            rarity = rarity,
+            bonusAttack = atk,
+            bonusDefense = def,
+            creationTime = PlatformUtils.getCurrentTimeMillis()
         )
     }
     
