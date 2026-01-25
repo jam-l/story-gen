@@ -30,6 +30,8 @@ fun ConditionEditor(
     factions: List<Faction> = emptyList(),
     characters: List<Character> = emptyList(),
     locations: List<Location> = emptyList(),
+    items: List<Item> = emptyList(),
+    variables: Map<String, String> = emptyMap(),
     onContentChange: (NodeContent) -> Unit
 ) {
     
@@ -40,6 +42,8 @@ fun ConditionEditor(
             expression = content.expression,
             clues = clues,
             factions = factions,
+            items = items,
+            variables = variables.keys.toList(),
             onExpressionChange = { newExpression ->
                 onContentChange(content.copy(expression = newExpression))
             }
@@ -90,6 +94,8 @@ fun ConditionExpressionEditor(
     expression: String,
     clues: List<Clue> = emptyList(),
     factions: List<Faction> = emptyList(),
+    items: List<Item> = emptyList(),
+    variables: List<String> = emptyList(),
     onExpressionChange: (String) -> Unit
 ) {
     var expressionType by remember(expression) { mutableStateOf(parseExpressionType(expression)) }
@@ -146,6 +152,7 @@ fun ConditionExpressionEditor(
                     variableName = variableName,
                     operator = operator,
                     value = value,
+                    availableVariables = variables,
                     onVariableChange = { variableName = it; update() },
                     onOperatorChange = { operator = it; update() },
                     onValueChange = { value = it; update() }
@@ -154,6 +161,7 @@ fun ConditionExpressionEditor(
             expressionType == ExpressionType.ITEM -> {
                 ItemConditionEditor(
                     itemId = variableName,
+                    items = items,
                     onItemChange = { variableName = it; update() }
                 )
             }
@@ -206,19 +214,72 @@ private fun VariableConditionEditor(
     variableName: String,
     operator: String,
     value: String,
+    availableVariables: List<String>,
     onVariableChange: (String) -> Unit,
     onOperatorChange: (String) -> Unit,
     onValueChange: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = variableName,
-            onValueChange = onVariableChange,
-            label = { Text("变量名") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("例如: player_level") }
-        )
+        var expanded by remember { mutableStateOf(false) }
+        
+        if (availableVariables.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "暂无可用变量，请先定义变量",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = variableName,
+                    onValueChange = onVariableChange,
+                    label = { Text("变量名") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = true, // 只能选择
+                    placeholder = { Text("例如: player_level") },
+                    trailingIcon = {
+                        IconButton(onClick = { expanded = true }) {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "选择变量")
+                        }
+                    },
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        .also { interactionSource ->
+                            LaunchedEffect(interactionSource) {
+                                interactionSource.interactions.collect {
+                                    if (it is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                                        expanded = true
+                                    }
+                                }
+                            }
+                        }
+                )
+                
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    availableVariables.forEach { variable ->
+                        DropdownMenuItem(
+                            text = { Text(variable) },
+                            onClick = {
+                                onVariableChange(variable)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
         
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -270,6 +331,7 @@ private fun VariableConditionEditor(
 @Composable
 private fun ItemConditionEditor(
     itemId: String,
+    items: List<Item>,
     onItemChange: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -279,14 +341,71 @@ private fun ItemConditionEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
-        OutlinedTextField(
-            value = itemId,
-            onValueChange = onItemChange,
-            label = { Text("道具 ID") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("例如: key_gold") }
-        )
+        var expanded by remember { mutableStateOf(false) }
+        
+        if (items.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "暂无可用道具，请先在数据库中添加",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = itemId,
+                    onValueChange = onItemChange,
+                    label = { Text("道具 ID") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = true, // 只能选择
+                    placeholder = { Text("例如: key_gold") },
+                    trailingIcon = {
+                        IconButton(onClick = { expanded = true }) {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "选择道具")
+                        }
+                    },
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        .also { interactionSource ->
+                            LaunchedEffect(interactionSource) {
+                                interactionSource.interactions.collect {
+                                    if (it is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                                        expanded = true
+                                    }
+                                }
+                            }
+                        }
+                )
+                
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    items.forEach { item ->
+                        DropdownMenuItem(
+                            text = { 
+                                Column {
+                                    Text(item.name, fontWeight = FontWeight.Bold)
+                                    Text(item.id, style = MaterialTheme.typography.bodySmall)
+                                }
+                            },
+                            onClick = {
+                                onItemChange(item.id)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -374,6 +493,21 @@ private fun ClueConditionEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
+    if (clues.isEmpty()) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "暂无可用线索，请先在数据库中添加",
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    } else {
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = clueId,
@@ -381,11 +515,22 @@ private fun ClueConditionEditor(
                 label = { Text("线索 ID") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = true, // 只能选择
                 trailingIcon = {
                      IconButton(onClick = { expanded = true }) {
                         Icon(Icons.Default.ArrowDropDown, contentDescription = "选择线索")
                     }
-                }
+                },
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    .also { interactionSource ->
+                        LaunchedEffect(interactionSource) {
+                            interactionSource.interactions.collect {
+                                if (it is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                                    expanded = true
+                                }
+                            }
+                        }
+                    }
             )
             
             DropdownMenu(
@@ -404,6 +549,7 @@ private fun ClueConditionEditor(
                 }
             }
         }
+    }
     }
 }
 
@@ -426,32 +572,59 @@ private fun FactionConditionEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
-         Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = factionId,
-                onValueChange = onFactionChange,
-                label = { Text("阵营 ID") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                trailingIcon = {
-                     IconButton(onClick = { expanded = true }) {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "选择阵营")
-                    }
-                }
-            )
-             DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth(0.7f)
+        if (factions.isEmpty()) {
+             Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                factions.forEach { faction ->
-                    DropdownMenuItem(
-                        text = { Text(faction.name) },
-                        onClick = {
-                            onFactionChange(faction.id)
-                            expanded = false
+                Text(
+                    text = "暂无可用阵营，请先在数据库中添加",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        } else {
+             Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = factionId,
+                    onValueChange = onFactionChange,
+                    label = { Text("阵营 ID") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = true, // 只能选择
+                    trailingIcon = {
+                         IconButton(onClick = { expanded = true }) {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "选择阵营")
                         }
-                    )
+                    },
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        .also { interactionSource ->
+                            LaunchedEffect(interactionSource) {
+                                interactionSource.interactions.collect {
+                                    if (it is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                                        expanded = true
+                                    }
+                                }
+                            }
+                        }
+                )
+                 DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    factions.forEach { faction ->
+                        DropdownMenuItem(
+                            text = { Text(faction.name) },
+                            onClick = {
+                                onFactionChange(faction.id)
+                                expanded = false
+                            }
+                        )
+                    }
                 }
             }
         }

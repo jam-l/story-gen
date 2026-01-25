@@ -19,20 +19,54 @@ import com.novelsim.app.data.model.*
 fun VariableEditor(
     content: NodeContent.VariableAction,
     availableNodes: List<StoryNode>,
+    availableVariables: List<String> = emptyList(),
     onContentChange: (NodeContent) -> Unit
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 变量名
-        OutlinedTextField(
-            value = content.variableName,
-            onValueChange = { onContentChange(content.copy(variableName = it)) },
-            label = { Text("变量名") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("例如: player_score") }
-        )
+        // 变量名
+        var expandedVar by remember { mutableStateOf(false) }
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = content.variableName,
+                onValueChange = { onContentChange(content.copy(variableName = it)) },
+                label = { Text("变量名") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("例如: player_score") },
+                trailingIcon = {
+                    IconButton(onClick = { expandedVar = true }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "选择变量")
+                    }
+                }
+            )
+            
+            DropdownMenu(
+                expanded = expandedVar,
+                onDismissRequest = { expandedVar = false },
+                modifier = Modifier.fillMaxWidth(0.6f)
+            ) {
+                if (availableVariables.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("无可用变量") },
+                        onClick = { expandedVar = false },
+                        enabled = false
+                    )
+                } else {
+                    availableVariables.forEach { variable ->
+                        DropdownMenuItem(
+                            text = { Text(variable) },
+                            onClick = {
+                                onContentChange(content.copy(variableName = variable))
+                                expandedVar = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
         
         // 操作类型 (Dropdown)
         Text(
@@ -283,6 +317,7 @@ fun BattleEditor(
 fun ItemActionEditor(
     content: NodeContent.ItemAction,
     availableNodes: List<StoryNode>,
+    items: List<Item> = emptyList(),
     onContentChange: (NodeContent) -> Unit
 ) {
     Column(
@@ -345,14 +380,70 @@ fun ItemActionEditor(
         }
         
         // 道具 ID
-        OutlinedTextField(
-            value = content.itemId,
-            onValueChange = { onContentChange(content.copy(itemId = it)) },
-            label = { Text("道具 ID") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("例如: potion_hp") }
-        )
+        if (items.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "暂无可用道具，请先在数据库中添加",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        } else {
+            var expandedItem by remember { mutableStateOf(false) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = content.itemId,
+                    onValueChange = { onContentChange(content.copy(itemId = it)) },
+                    label = { Text("道具 ID") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = true, // 只能选择
+                    placeholder = { Text("例如: potion_hp") },
+                    trailingIcon = {
+                        IconButton(onClick = { expandedItem = true }) {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "选择道具")
+                        }
+                    },
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        .also { interactionSource ->
+                            LaunchedEffect(interactionSource) {
+                                interactionSource.interactions.collect {
+                                    if (it is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                                        expandedItem = true
+                                    }
+                                }
+                            }
+                        }
+                )
+                
+                DropdownMenu(
+                    expanded = expandedItem,
+                    onDismissRequest = { expandedItem = false },
+                    modifier = Modifier.fillMaxWidth(0.6f)
+                ) {
+                    items.forEach { item ->
+                        DropdownMenuItem(
+                            text = { 
+                                Column {
+                                    Text(item.name, fontWeight = FontWeight.Bold)
+                                    Text(item.id, style = MaterialTheme.typography.bodySmall)
+                                }
+                            },
+                            onClick = {
+                                onContentChange(content.copy(itemId = item.id))
+                                expandedItem = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
         
         // 数量
         OutlinedTextField(

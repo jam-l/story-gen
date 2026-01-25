@@ -153,6 +153,8 @@ data class EditorScreen(
                                     locations = uiState.locations,
                                     events = uiState.events,
                                     enemies = uiState.enemies,
+                                    items = uiState.story?.items ?: emptyList(),
+                                    variables = uiState.story?.variables ?: emptyMap(),
                                     onContentChange = { screenModel.updateNodeContent(node.id, it) },
                                     onDelete = { screenModel.deleteNode(node.id) },
                                     onClose = { screenModel.closeNodeEditor() }
@@ -705,6 +707,8 @@ private fun NodeEditorPanel(
     locations: List<Location> = emptyList(),
     events: List<GameEvent> = emptyList(),
     enemies: List<Enemy> = emptyList(),
+    items: List<Item> = emptyList(),
+    variables: Map<String, String> = emptyMap(),
     onContentChange: (NodeContent) -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit
@@ -789,6 +793,8 @@ private fun NodeEditorPanel(
                                 factions = factions,
                                 characters = characters,
                                 locations = locations,
+                                items = items,
+                                variables = variables,
                                 onContentChange = onContentChange
                             )
                         }
@@ -796,6 +802,7 @@ private fun NodeEditorPanel(
                             VariableEditor(
                                 content = content,
                                 availableNodes = allNodes.map { it.node },
+                                availableVariables = variables.keys.toList(),
                                 onContentChange = onContentChange
                             )
                         }
@@ -811,6 +818,7 @@ private fun NodeEditorPanel(
                             ItemActionEditor(
                                 content = content,
                                 availableNodes = allNodes.map { it.node },
+                                items = items,
                                 onContentChange = onContentChange
                             )
                         }
