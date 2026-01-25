@@ -99,7 +99,8 @@ data class Item(
     val icon: String? = null,
     val price: Int = 0,
     val stackable: Boolean = true,
-    val maxStack: Int = 99
+    val maxStack: Int = 99,
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**
@@ -168,7 +169,8 @@ data class Enemy(
     val skills: List<String> = emptyList(),
     val drops: List<EnemyDrop> = emptyList(),
     val expReward: Int = 10,
-    val goldReward: Int = 5
+    val goldReward: Int = 5,
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**

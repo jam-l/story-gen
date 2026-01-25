@@ -295,7 +295,8 @@ data class Character(
     val baseStats: CharacterStats = CharacterStats(),
     val factionId: String? = null,
     val relationships: Map<String, Int> = emptyMap(),
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**
@@ -309,7 +310,8 @@ data class Location(
     val background: String? = null,
     val connectedLocationIds: List<String> = emptyList(),
     val npcs: List<String> = emptyList(),
-    val events: List<String> = emptyList()
+    val events: List<String> = emptyList(),
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**
@@ -345,7 +347,8 @@ data class Faction(
     val id: String,
     val name: String,
     val description: String,
-    val reputation: Int = 0
+    val reputation: Int = 0,
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**

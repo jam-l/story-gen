@@ -361,7 +361,8 @@ class StoryRepository(
             baseStatsJson = json.encodeToString(character.baseStats),
             factionId = character.factionId,
             relationshipsJson = json.encodeToString(character.relationships),
-            tagsJson = json.encodeToString(character.tags)
+            tagsJson = json.encodeToString(character.tags),
+            variablesJson = json.encodeToString(character.variables)
         )
     }
 
@@ -384,7 +385,8 @@ class StoryRepository(
             baseStats = try { json.decodeFromString(baseStatsJson) } catch (e: Exception) { CharacterStats() },
             factionId = factionId,
             relationships = try { json.decodeFromString(relationshipsJson) } catch (e: Exception) { emptyMap() },
-            tags = try { json.decodeFromString(tagsJson) } catch (e: Exception) { emptyList() }
+            tags = try { json.decodeFromString(tagsJson) } catch (e: Exception) { emptyList() },
+            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
     
@@ -411,7 +413,8 @@ class StoryRepository(
             background = location.background,
             connectedLocationIdsJson = json.encodeToString(location.connectedLocationIds),
             npcsJson = json.encodeToString(location.npcs),
-            eventsJson = json.encodeToString(location.events)
+            eventsJson = json.encodeToString(location.events),
+            variablesJson = json.encodeToString(location.variables)
         )
     }
 
@@ -433,7 +436,8 @@ class StoryRepository(
             background = background,
             connectedLocationIds = try { json.decodeFromString(connectedLocationIdsJson) } catch (e: Exception) { emptyList() },
             npcs = try { json.decodeFromString(npcsJson) } catch (e: Exception) { emptyList() },
-            events = try { json.decodeFromString(eventsJson) } catch (e: Exception) { emptyList() }
+            events = try { json.decodeFromString(eventsJson) } catch (e: Exception) { emptyList() },
+            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
     
@@ -548,7 +552,8 @@ class StoryRepository(
             storyId = storyId,
             name = faction.name,
             description = faction.description,
-            reputation = faction.reputation.toLong()
+            reputation = faction.reputation.toLong(),
+            variablesJson = json.encodeToString(faction.variables)
         )
     }
 
@@ -567,7 +572,8 @@ class StoryRepository(
             id = id,
             name = name,
             description = description,
-            reputation = reputation.toInt()
+            reputation = reputation.toInt(),
+            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
 
@@ -593,7 +599,8 @@ class StoryRepository(
             description = enemy.description,
             statsJson = json.encodeToString(enemy.stats),
             expReward = enemy.expReward.toLong(),
-            goldReward = enemy.goldReward.toLong()
+            goldReward = enemy.goldReward.toLong(),
+            variablesJson = json.encodeToString(enemy.variables)
         )
     }
 
@@ -614,7 +621,8 @@ class StoryRepository(
             description = description,
             stats = try { json.decodeFromString(statsJson) } catch (e: Exception) { CharacterStats() },
             expReward = expReward.toInt(),
-            goldReward = goldReward.toInt()
+            goldReward = goldReward.toInt(),
+            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
 
@@ -643,7 +651,8 @@ class StoryRepository(
             price = item.price.toLong(),
             stackable = if (item.stackable) 1L else 0L,
             maxStack = item.maxStack.toLong(),
-            icon = item.icon
+            icon = item.icon,
+            variablesJson = json.encodeToString(item.variables)
         )
     }
 
@@ -667,7 +676,8 @@ class StoryRepository(
             price = price.toInt(),
             stackable = stackable == 1L,
             maxStack = maxStack.toInt(),
-            icon = icon
+            icon = icon,
+            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
     // ============================================================================================

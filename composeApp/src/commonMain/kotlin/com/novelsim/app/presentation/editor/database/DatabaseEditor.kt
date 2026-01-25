@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.novelsim.app.presentation.editor.EditorScreenModel
 import com.novelsim.app.data.model.Character
 import com.novelsim.app.presentation.editor.components.StatInput
+import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 
 /**
  * 数据库编辑器主界面
@@ -304,6 +305,14 @@ fun CharacterDetailEditor(
                 }
             }
         }
+        
+        // 自定义属性
+        EntityVariableEditor(
+            variables = character.variables,
+            onVariablesChange = { newVars ->
+                onSave(character.copy(variables = newVars))
+            }
+        )
     }
 
     if (showDeleteConfirm) {
