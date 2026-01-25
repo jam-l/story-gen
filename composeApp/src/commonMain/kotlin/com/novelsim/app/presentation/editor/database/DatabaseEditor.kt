@@ -31,48 +31,46 @@ fun DatabaseEditor(
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物", "道具", "变量")
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // 顶部栏
-            TopAppBar(
-                title = { Text("故事数据库") },
-                navigationIcon = {
-                    IconButton(onClick = onDismissRequest) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    titleContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
-
-            // 标签栏
-            TabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(title) }
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text("故事数据库") },
+                    navigationIcon = {
+                        IconButton(onClick = onDismissRequest) {
+                            Icon(Icons.Default.Close, contentDescription = "关闭")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        titleContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                )
+
+                // 标签栏
+                TabRow(selectedTabIndex = selectedTab) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = { Text(title) }
+                        )
+                    }
                 }
             }
-
-            // 内容区域
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (selectedTab) {
-                    0 -> CharacterEditor(screenModel)
-                    1 -> LocationEditor(screenModel)
-                    2 -> EventEditor(screenModel)
-                    3 -> ClueEditor(screenModel)
-                    4 -> FactionEditor(screenModel)
-                    5 -> EnemyEditor(screenModel)
-                    6 -> ItemEditor(screenModel)
-                    7 -> VariableListEditor(screenModel)
-                }
+        }
+    ) { paddingValues ->
+        // 内容区域
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            when (selectedTab) {
+                0 -> CharacterEditor(screenModel)
+                1 -> LocationEditor(screenModel)
+                2 -> EventEditor(screenModel)
+                3 -> ClueEditor(screenModel)
+                4 -> FactionEditor(screenModel)
+                5 -> EnemyEditor(screenModel)
+                6 -> ItemEditor(screenModel)
+                7 -> VariableListEditor(screenModel)
             }
         }
     }
