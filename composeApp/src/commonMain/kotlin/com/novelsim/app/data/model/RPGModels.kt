@@ -237,6 +237,8 @@ data class GameState(
     val itemInstances: MutableMap<String, ItemInstance> = mutableMapOf(),
     val equipment: Equipment = Equipment(),
     val variables: MutableMap<String, String> = mutableMapOf(),
+    // store entity specific variables: key="type:id:varKey", value="value"
+    val entityVariables: MutableMap<String, String> = mutableMapOf(),
     val gold: Int = 0,
     val playTime: Long = 0L,
     val flags: MutableSet<String> = mutableSetOf(),

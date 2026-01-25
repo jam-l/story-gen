@@ -182,6 +182,9 @@ class StoryEngine(
         val state = currentGameState ?: return false
         
         return when {
+            expression.startsWith("@") -> {
+                evaluateEntityCondition(expression, state)
+            }
             expression.startsWith("has_item:") -> {
                 val itemId = expression.removePrefix("has_item:")
                 state.inventory.any { it.itemId == itemId && it.quantity > 0 }
@@ -195,28 +198,30 @@ class StoryEngine(
                 flagName in state.flags
             }
             expression.startsWith("reputation:") -> {
-                // expecting "reputation:factionId > 50"
-                // split by space first to get "reputation:factionId", ">", "50"
-                // or just regex/parsing
-                val parts = expression.trim().split(Regex("\\s+"))
-                if (parts.size >= 3) {
-                    val reputationKey = parts[0] // reputation:factionId
-                    val operator = parts[1]
-                    val value = parts[2].toIntOrNull() ?: 0
-                    
-                    val factionId = reputationKey.removePrefix("reputation:")
-                    val currentRep = state.factionReputations[factionId] ?: 0
-                    
-                    when (operator) {
-                        ">" -> currentRep > value
-                        ">=" -> currentRep >= value
-                        "<" -> currentRep < value
-                        "<=" -> currentRep <= value
-                        "==" -> currentRep == value
-                        "!=" -> currentRep != value
-                        else -> false
-                    }
-                } else false
+                try {
+                    val parts = expression.trim().split(Regex("\\s+"))
+                    if (parts.size >= 3) {
+                        val reputationKey = parts[0] // reputation:factionId
+                        val operator = parts[1]
+                        val value = parts[2].toIntOrNull() ?: 0
+                        
+                        val factionId = reputationKey.removePrefix("reputation:")
+                        val currentRep = state.factionReputations[factionId] ?: 0
+                        
+                        when (operator) {
+                            ">" -> currentRep > value
+                            ">=" -> currentRep >= value
+                            "<" -> currentRep < value
+                            "<=" -> currentRep <= value
+                            "==" -> currentRep == value
+                            "!=" -> currentRep != value
+                            else -> false
+                        }
+                    } else false
+                } catch (e: Exception) {
+                    println("Error parsing reputation condition: ${e.message}")
+                    false
+                }
             }
             expression.contains(">") -> {
                 val parts = expression.split(">").map { it.trim() }
@@ -242,6 +247,77 @@ class StoryEngine(
                 } else false
             }
             else -> false
+        }
+    }
+
+    private fun evaluateEntityCondition(expression: String, state: GameState): Boolean {
+        // format: @type:id:key operator value
+        // example: @char:hero_1:loyalty > 50
+        
+        try {
+            // 1. Parse operator and value
+            val operator = Regex("(>=|<=|==|!=|>|<)").find(expression)?.value ?: return false
+            // Split by the operator to separate variable part and value part
+            // Note: split limit 2 ensures we only split at the first operator occurrence if multiple exist (unlikely in valid expr)
+            val parts = expression.split(operator, limit = 2)
+            if (parts.size != 2) return false
+            
+            val varPart = parts[0].trim().removePrefix("@") // "char:hero_1:loyalty"
+            val targetValueStr = parts[1].trim()
+            
+            // 2. Parse entity identity
+            val varParts = varPart.split(":")
+            if (varParts.size < 3) return false
+            
+            val type = varParts[0] // "char"
+            val id = varParts[1]   // "hero_1"
+            val key = varParts[2]  // "loyalty"
+            
+            // 3. Get actual value
+            // First check dynamic state in GameState
+            val dynamicKey = "$type:$id:$key"
+            var actualValueStr = state.entityVariables[dynamicKey]
+            
+            // If not found in dynamic state, check static definition in Story
+            if (actualValueStr == null) {
+                val story = currentStory ?: return false
+                actualValueStr = when(type) {
+                    "char" -> story.characters.find { it.id == id }?.variables?.get(key)
+                    "loc" -> story.locations.find { it.id == id }?.variables?.get(key)
+                    "item" -> story.items.find { it.id == id }?.variables?.get(key)
+                    else -> null
+                }
+            }
+            
+            // Default to "0" for numeric comparison if null, or "" for string
+            val actualValue = actualValueStr ?: "0"
+            
+            // 4. Compare
+            // Try numeric comparison first
+            val numActual = actualValue.toDoubleOrNull()
+            val numTarget = targetValueStr.toDoubleOrNull()
+            
+            if (numActual != null && numTarget != null) {
+                return when(operator) {
+                    ">" -> numActual > numTarget
+                    ">=" -> numActual >= numTarget
+                    "<" -> numActual < numTarget
+                    "<=" -> numActual <= numTarget
+                    "==" -> numActual == numTarget
+                    "!=" -> numActual != numTarget
+                    else -> false
+                }
+            }
+            
+            // String comparison
+            return when(operator) {
+                "==" -> actualValue == targetValueStr
+                "!=" -> actualValue != targetValueStr
+                else -> false
+            }
+        } catch (e: Exception) {
+            println("Error evaluating entity condition '$expression': ${e.message}")
+            return false
         }
     }
     

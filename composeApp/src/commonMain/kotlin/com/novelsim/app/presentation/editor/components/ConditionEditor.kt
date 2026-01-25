@@ -43,6 +43,8 @@ fun ConditionEditor(
             clues = clues,
             factions = factions,
             items = items,
+            characters = characters,
+            locations = locations,
             variables = variables.keys.toList(),
             onExpressionChange = { newExpression ->
                 onContentChange(content.copy(expression = newExpression))
@@ -95,6 +97,8 @@ fun ConditionExpressionEditor(
     clues: List<Clue> = emptyList(),
     factions: List<Faction> = emptyList(),
     items: List<Item> = emptyList(),
+    characters: List<Character> = emptyList(),
+    locations: List<Location> = emptyList(),
     variables: List<String> = emptyList(),
     onExpressionChange: (String) -> Unit
 ) {
@@ -104,6 +108,11 @@ fun ConditionExpressionEditor(
     var value by remember(expression) { mutableStateOf(parseValue(expression)) }
 
     // Helper to constructing expression string and notify change
+    // For ENTITY_VAR, we use extra state
+    var entityType by remember(expression) { mutableStateOf(parseEntityType(expression)) }
+    var entityId by remember(expression) { mutableStateOf(parseEntityId(expression)) }
+    var entityVarKey by remember(expression) { mutableStateOf(parseEntityVarKey(expression)) }
+
     fun update() {
         val newExpr = when (expressionType) {
             ExpressionType.VARIABLE -> "$variableName $operator $value"
@@ -111,6 +120,7 @@ fun ConditionExpressionEditor(
             ExpressionType.CLUE -> "has_clue:$variableName"
             ExpressionType.FACTION -> "reputation:$variableName $operator $value"
             ExpressionType.FLAG -> "flag:$variableName"
+            ExpressionType.ENTITY_VAR -> "@$entityType:$entityId:$entityVarKey $operator $value"
         }
         onExpressionChange(newExpr)
     }
@@ -151,6 +161,12 @@ fun ConditionExpressionEditor(
                 expressionType = ExpressionType.FACTION
                 if (factions.isNotEmpty()) { variableName = factions.first().id }
                 update() 
+            }
+            ConditionTypeChip("实体变量", expressionType == ExpressionType.ENTITY_VAR) {
+                expressionType = ExpressionType.ENTITY_VAR
+                entityType = "char"
+                if (characters.isNotEmpty()) { entityId = characters.first().id }
+                update()
             }
         }
         
@@ -197,6 +213,23 @@ fun ConditionExpressionEditor(
                 FlagConditionEditor(
                     flagName = variableName,
                     onFlagChange = { variableName = it; update() }
+                )
+            }
+            expressionType == ExpressionType.ENTITY_VAR -> {
+                EntityVariableConditionEditor(
+                    entityType = entityType,
+                    entityId = entityId,
+                    variableKey = entityVarKey,
+                    operator = operator,
+                    value = value,
+                    characters = characters,
+                    locations = locations,
+                    items = items,
+                    onEntityTypeChange = { entityType = it; update() },
+                    onEntityIdChange = { entityId = it; update() },
+                    onVariableKeyChange = { entityVarKey = it; update() },
+                    onOperatorChange = { operator = it; update() },
+                    onValueChange = { value = it; update() }
                 )
             }
         }
@@ -447,10 +480,11 @@ private fun FlagConditionEditor(
 
 
 // 辅助函数
-private enum class ExpressionType { VARIABLE, ITEM, CLUE, FACTION, FLAG }
+private enum class ExpressionType { VARIABLE, ITEM, CLUE, FACTION, FLAG, ENTITY_VAR }
 
 private fun parseExpressionType(expression: String): ExpressionType {
     return when {
+        expression.startsWith("@") -> ExpressionType.ENTITY_VAR
         expression.startsWith("has_item:") -> ExpressionType.ITEM
         expression.startsWith("has_clue:") -> ExpressionType.CLUE
         expression.startsWith("reputation:") -> ExpressionType.FACTION
@@ -478,8 +512,29 @@ private fun parseOperator(expression: String): String {
 }
 
 private fun parseValue(expression: String): String {
-    val parts = expression.split(Regex("[><=!]+"))
+    val parts = expression.split(Regex("[><!=]+"))
     return if (parts.size > 1) parts.last().trim() else ""
+}
+
+// 解析实体变量表达式 @type:id:key 格式
+private fun parseEntityType(expression: String): String {
+    if (!expression.startsWith("@")) return "char"
+    val parts = expression.removePrefix("@").split(":")
+    return parts.getOrNull(0) ?: "char"
+}
+
+private fun parseEntityId(expression: String): String {
+    if (!expression.startsWith("@")) return ""
+    val parts = expression.removePrefix("@").split(":")
+    return parts.getOrNull(1) ?: ""
+}
+
+private fun parseEntityVarKey(expression: String): String {
+    if (!expression.startsWith("@")) return ""
+    val parts = expression.removePrefix("@").split(":")
+    // key 可能包含空格和操作符，需要分割
+    val keyPart = parts.getOrNull(2) ?: return ""
+    return keyPart.split(Regex("[><!=]+")).firstOrNull()?.trim() ?: ""
 }
 
 // private fun updateExpression removed as it is now local inside ConditionExpressionEditor
@@ -688,3 +743,173 @@ private fun FactionConditionEditor(
         }
     }
 }
+
+/**
+ * 实体变量条件编辑器
+ * 用于编辑 @type:id:key 格式的实体变量条件
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntityVariableConditionEditor(
+    entityType: String,
+    entityId: String,
+    variableKey: String,
+    operator: String,
+    value: String,
+    characters: List<Character>,
+    locations: List<Location>,
+    items: List<Item>,
+    onEntityTypeChange: (String) -> Unit,
+    onEntityIdChange: (String) -> Unit,
+    onVariableKeyChange: (String) -> Unit,
+    onOperatorChange: (String) -> Unit,
+    onValueChange: (String) -> Unit
+) {
+    val entityTypes = listOf(
+        "char" to "角色",
+        "loc" to "地点",
+        "item" to "道具"
+    )
+    
+    // 根据选中的实体类型获取可选实体列表
+    val availableEntities = when (entityType) {
+        "char" -> characters.map { it.id to it.name }
+        "loc" -> locations.map { it.id to it.name }
+        "item" -> items.map { it.id to it.name }
+        else -> emptyList()
+    }
+    
+    // 获取选中实体的变量列表
+    val availableVariables = when (entityType) {
+        "char" -> characters.find { it.id == entityId }?.variables?.keys?.toList() ?: emptyList()
+        "loc" -> locations.find { it.id == entityId }?.variables?.keys?.toList() ?: emptyList()
+        "item" -> items.find { it.id == entityId }?.variables?.keys?.toList() ?: emptyList()
+        else -> emptyList()
+    }
+    
+    val operators = listOf(
+        ">" to "大于",
+        "<" to "小于",
+        ">=" to "大于等于",
+        "<=" to "小于等于",
+        "==" to "等于",
+        "!=" to "不等于"
+    )
+    
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // 实体类型选择
+        Text("实体类型", style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            entityTypes.forEach { (type, label) ->
+                FilterChip(
+                    selected = entityType == type,
+                    onClick = { onEntityTypeChange(type) },
+                    label = { Text(label) }
+                )
+            }
+        }
+        
+        // 实体选择
+        var entityExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = entityExpanded,
+            onExpandedChange = { entityExpanded = !entityExpanded }
+        ) {
+            OutlinedTextField(
+                value = availableEntities.find { it.first == entityId }?.second ?: entityId,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("选择${entityTypes.find { it.first == entityType }?.second ?: "实体"}") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = entityExpanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = entityExpanded,
+                onDismissRequest = { entityExpanded = false }
+            ) {
+                availableEntities.forEach { (id, name) ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            onEntityIdChange(id)
+                            entityExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+        
+        // 变量选择
+        var varExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = varExpanded,
+            onExpandedChange = { varExpanded = !varExpanded }
+        ) {
+            OutlinedTextField(
+                value = variableKey,
+                onValueChange = onVariableKeyChange,
+                label = { Text("变量名") },
+                trailingIcon = { 
+                    if (availableVariables.isNotEmpty()) {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = varExpanded) 
+                    }
+                },
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                placeholder = { Text("例如: loyalty, durability") }
+            )
+            if (availableVariables.isNotEmpty()) {
+                ExposedDropdownMenu(
+                    expanded = varExpanded,
+                    onDismissRequest = { varExpanded = false }
+                ) {
+                    availableVariables.forEach { varName ->
+                        DropdownMenuItem(
+                            text = { Text(varName) },
+                            onClick = {
+                                onVariableKeyChange(varName)
+                                varExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        
+        // 操作符和值
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            var opExpanded by remember { mutableStateOf(false) }
+            Box(modifier = Modifier.weight(1f)) {
+                OutlinedTextField(
+                    value = operators.find { it.first == operator }?.second ?: operator,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("操作符") },
+                    modifier = Modifier.fillMaxWidth().clickable { opExpanded = true }
+                )
+                DropdownMenu(
+                    expanded = opExpanded,
+                    onDismissRequest = { opExpanded = false }
+                ) {
+                    operators.forEach { (op, label) ->
+                        DropdownMenuItem(
+                            text = { Text("$label ($op)") },
+                            onClick = {
+                                onOperatorChange(op)
+                                opExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text("值") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+        }
+    }
+}
+
