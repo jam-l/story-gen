@@ -50,7 +50,7 @@ data class StoryPlayerScreen(
             saveId?.let { screenModel.loadFromSave(it) }
         }
         
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
             when {
                 uiState.isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
