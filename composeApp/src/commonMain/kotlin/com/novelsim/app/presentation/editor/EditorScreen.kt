@@ -507,6 +507,7 @@ private fun NodeCard(
         NodeType.BATTLE -> Color(0xFFE53935)
         NodeType.ITEM -> Color(0xFF43A047)
         NodeType.VARIABLE -> Color(0xFF8E24AA)
+        NodeType.RANDOM -> Color(0xFFBA68C8)
         NodeType.END -> Color(0xFF757575)
     }
     
@@ -518,6 +519,7 @@ private fun NodeCard(
         NodeType.BATTLE -> Icons.Default.Star
         NodeType.ITEM -> Icons.Default.Favorite
         NodeType.VARIABLE -> Icons.Default.Build
+        NodeType.RANDOM -> Icons.Default.Refresh
         NodeType.END -> Icons.Default.Check
     }
     
@@ -528,6 +530,7 @@ private fun NodeCard(
         is NodeContent.Battle -> "战斗: ${content.enemyId}"
         is NodeContent.ItemAction -> "${content.action}: ${content.itemId}"
         is NodeContent.VariableAction -> "${content.variableName} ${content.operation}"
+        is NodeContent.Random -> "随机: ${content.branches.size} 分支"
         is NodeContent.Ending -> content.title
     }
     
@@ -643,6 +646,9 @@ private fun AddNodeMenu(
                 }
                 NodeTypeButton("变量", Icons.Default.Build, Color(0xFF8E24AA)) { 
                     onAddNode(NodeType.VARIABLE) 
+                }
+                NodeTypeButton("随机", Icons.Default.Refresh, Color(0xFFBA68C8)) { 
+                    onAddNode(NodeType.RANDOM) 
                 }
                 NodeTypeButton("结局", Icons.Default.Check, Color(0xFF757575)) { 
                     onAddNode(NodeType.END) 
@@ -803,6 +809,13 @@ private fun NodeEditorPanel(
                         }
                         is NodeContent.ItemAction -> {
                             ItemActionEditor(
+                                content = content,
+                                availableNodes = allNodes.map { it.node },
+                                onContentChange = onContentChange
+                            )
+                        }
+                        is NodeContent.Random -> {
+                            RandomEditor(
                                 content = content,
                                 availableNodes = allNodes.map { it.node },
                                 onContentChange = onContentChange

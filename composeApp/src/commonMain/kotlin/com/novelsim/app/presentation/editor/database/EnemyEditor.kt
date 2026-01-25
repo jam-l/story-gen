@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.novelsim.app.data.model.CharacterStats
 import com.novelsim.app.data.model.Enemy
 import com.novelsim.app.presentation.editor.EditorScreenModel
+import com.novelsim.app.presentation.editor.components.StatInput
+import androidx.compose.material3.HorizontalDivider
 import com.novelsim.app.util.PlatformUtils
 
 @Composable

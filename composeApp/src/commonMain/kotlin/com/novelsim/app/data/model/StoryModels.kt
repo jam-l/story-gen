@@ -18,6 +18,8 @@ enum class NodeType {
     ITEM,
     /** 变量操作 - 修改游戏变量 */
     VARIABLE,
+    /** 随机分支 - 概率跳转 */
+    RANDOM,
     /** 结局节点 - 故事结束 */
     END
 }
@@ -120,6 +122,14 @@ sealed class NodeContent {
         val value: String,
         val nextNodeId: String
     ) : NodeContent()
+
+    /**
+     * 随机分支内容
+     */
+    @Serializable
+    data class Random(
+        val branches: List<RandomBranch>
+    ) : NodeContent()
     
     /**
      * 结局内容
@@ -144,6 +154,15 @@ data class ChoiceOption(
     val nextNodeId: String,
     val condition: String? = null,
     val effects: List<Effect> = emptyList()
+)
+
+/**
+ * 随机分支选项
+ */
+@Serializable
+data class RandomBranch(
+    val nextNodeId: String,
+    val weight: Int
 )
 
 /**

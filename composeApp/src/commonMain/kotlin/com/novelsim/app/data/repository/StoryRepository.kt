@@ -30,6 +30,7 @@ class StoryRepository(
     private val clueQueries = database.clueQueries
     private val factionQueries = database.factionQueries
     private val enemyQueries = database.enemyQueries
+    private val itemQueries = database.itemQueries
 
     
     private val json = Json { 
@@ -99,6 +100,8 @@ class StoryRepository(
 
             // 从独立表加载怪物
             enemies = enemyQueries.getEnemiesForStory(storyId).executeAsList().map { it.toEnemy() },
+            // 从独立表加载物品
+            items = itemQueries.getItemsForStory(storyId).executeAsList().map { it.toItem() },
             createdAt = dbStory.createdAt,
             updatedAt = dbStory.updatedAt
         )
@@ -146,6 +149,22 @@ class StoryRepository(
                     statsJson = json.encodeToString(enemy.stats),
                     expReward = enemy.expReward.toLong(),
                     goldReward = enemy.goldReward.toLong()
+                )
+            }
+            
+            // 批量保存所有物品
+            story.items.forEach { item ->
+                itemQueries.insertItem(
+                    id = item.id,
+                    storyId = story.id,
+                    name = item.name,
+                    description = item.description,
+                    type = item.type.name,
+                    effectJson = json.encodeToString(item.effect),
+                    price = item.price.toLong(),
+                    stackable = if (item.stackable) 1L else 0L,
+                    maxStack = item.maxStack.toLong(),
+                    icon = item.icon
                 )
             }
         }
@@ -511,7 +530,7 @@ class StoryRepository(
     suspend fun deleteEnemy(enemyId: String, storyId: String) {
         enemyQueries.deleteEnemy(enemyId, storyId)
     }
-    
+
     /**
      * 数据库实体转领域模型
      */
@@ -523,6 +542,59 @@ class StoryRepository(
             stats = try { json.decodeFromString(statsJson) } catch (e: Exception) { CharacterStats() },
             expReward = expReward.toInt(),
             goldReward = goldReward.toInt()
+        )
+    }
+
+    // ============================================================================================
+    // 道具管理方法 (SQL Table)
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有道具
+     */
+    suspend fun getItems(storyId: String): List<Item> {
+        return itemQueries.getItemsForStory(storyId).executeAsList().map { it.toItem() }
+    }
+
+    /**
+     * 保存道具
+     */
+    suspend fun saveItem(item: Item, storyId: String) {
+        itemQueries.insertItem(
+            id = item.id,
+            storyId = storyId,
+            name = item.name,
+            description = item.description,
+            type = item.type.name,
+            effectJson = json.encodeToString(item.effect),
+            price = item.price.toLong(),
+            stackable = if (item.stackable) 1L else 0L,
+            maxStack = item.maxStack.toLong(),
+            icon = item.icon
+        )
+    }
+
+    /**
+     * 删除道具
+     */
+    suspend fun deleteItem(itemId: String, storyId: String) {
+        itemQueries.deleteItem(itemId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Item.toItem(): Item {
+        return Item(
+            id = id,
+            name = name,
+            description = description,
+            type = ItemType.valueOf(type),
+            effect = try { effectJson?.let { json.decodeFromString(it) } } catch (e: Exception) { null },
+            price = price.toInt(),
+            stackable = stackable == 1L,
+            maxStack = maxStack.toInt(),
+            icon = icon
         )
     }
     // ============================================================================================

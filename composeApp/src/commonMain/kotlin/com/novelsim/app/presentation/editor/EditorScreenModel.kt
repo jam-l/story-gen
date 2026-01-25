@@ -54,7 +54,8 @@ class EditorScreenModel(
         val events: List<GameEvent> = emptyList(), // 事件列表
         val clues: List<Clue> = emptyList(), // 线索列表
         val factions: List<Faction> = emptyList(), // 阵营列表
-        val enemies: List<Enemy> = emptyList() // 怪物列表
+        val enemies: List<Enemy> = emptyList(), // 怪物列表
+        val items: List<Item> = emptyList() // 道具列表
     )
     
     private val _uiState = MutableStateFlow(UiState())
@@ -96,6 +97,7 @@ class EditorScreenModel(
                 loadClues()
                 loadFactions()
                 loadEnemies()
+                loadItems()
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -167,6 +169,9 @@ class EditorScreenModel(
                 operation = VariableOperation.SET,
                 value = "0",
                 nextNodeId = ""
+            )
+            NodeType.RANDOM -> NodeContent.Random(
+                branches = emptyList()
             )
             NodeType.END -> NodeContent.Ending(
                 title = "结局",
@@ -608,6 +613,43 @@ class EditorScreenModel(
         screenModelScope.launch {
             storyRepository.deleteEnemy(enemyId, storyId)
             loadEnemies()
+        }
+    }
+
+    // ============================================================================================
+    // 道具管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载道具列表
+     */
+    private fun loadItems() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val items = storyRepository.getItems(storyId)
+            _uiState.update { it.copy(items = items) }
+        }
+    }
+    
+    /**
+     * 保存道具
+     */
+    fun saveItem(item: Item) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveItem(item, storyId)
+            loadItems()
+        }
+    }
+    
+    /**
+     * 删除道具
+     */
+    fun deleteItem(itemId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteItem(itemId, storyId)
+            loadItems()
         }
     }
 

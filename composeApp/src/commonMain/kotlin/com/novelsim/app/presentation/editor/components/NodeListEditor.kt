@@ -133,5 +133,6 @@ private fun getNodeSummary(content: NodeContent, enemies: List<com.novelsim.app.
         is NodeContent.Condition -> "条件: ${content.expression}"
         is NodeContent.ItemAction -> "物品: ${content.action} ${content.itemId}"
         is NodeContent.VariableAction -> "变量: ${content.variableName} ${content.operation} ${content.value}"
+        is NodeContent.Random -> "随机: ${content.branches.joinToString { "${it.weight}%" }}"
     }
 }

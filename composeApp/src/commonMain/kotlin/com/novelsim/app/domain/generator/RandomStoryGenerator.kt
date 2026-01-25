@@ -41,6 +41,9 @@ class RandomStoryGenerator(
         /** 包含变量节点的概率 */
         val variableProbability: Float = 0.1f,
         
+        /** 包含随机分支节点的概率 */
+        val randomNodeProbability: Float = 0.1f,
+        
         /** 结局数量 */
         val minEndings: Int = 1,
         val maxEndings: Int = 3,
@@ -285,6 +288,7 @@ class RandomStoryGenerator(
                 random.nextFloat() < config.conditionProbability -> NodeType.CONDITION
                 random.nextFloat() < config.itemProbability -> NodeType.ITEM
                 random.nextFloat() < config.variableProbability -> NodeType.VARIABLE
+                random.nextFloat() < config.randomNodeProbability -> NodeType.RANDOM
                 else -> NodeType.DIALOGUE
             }
             
@@ -293,6 +297,7 @@ class RandomStoryGenerator(
                 NodeType.CONDITION -> createConditionNode(nodeId, currentX, currentY)
                 NodeType.ITEM -> createItemNode(nodeId, currentX, currentY, customItems)
                 NodeType.VARIABLE -> createVariableNode(nodeId, currentX, currentY)
+                NodeType.RANDOM -> createRandomNode(nodeId, currentX, currentY)
                 else -> createDialogueNode(nodeId, currentX, currentY)
             }
             
@@ -597,13 +602,36 @@ class RandomStoryGenerator(
         )
     }
     
+    private fun createRandomNode(id: String, x: Float, y: Float): StoryNode {
+        // 创建 2-3 个随机分支
+        val branchCount = random.nextInt(2, 4)
+        val branches = mutableListOf<RandomBranch>()
+        
+        // 分配权重 (总和不需要严格为100，这里简单随机分配)
+        for (i in 0 until branchCount) {
+            branches.add(
+                RandomBranch(
+                    nextNodeId = "", // 连接阶段填充
+                    weight = random.nextInt(20, 80)
+                )
+            )
+        }
+        
+        return StoryNode(
+            id = id,
+            type = NodeType.RANDOM,
+            content = NodeContent.Random(branches),
+            position = NodePosition(x, y)
+        )
+    }
+
     private fun connectNodes(nodes: MutableMap<String, StoryNode>, nodeIds: List<String>) {
         // 找出不同类型的节点
         val dialogueNodes = nodeIds.filter { 
             val node = nodes[it]
             node?.type == NodeType.DIALOGUE || node?.type == NodeType.BATTLE ||
             node?.type == NodeType.ITEM || node?.type == NodeType.VARIABLE ||
-            node?.type == NodeType.CONDITION
+            node?.type == NodeType.CONDITION || node?.type == NodeType.RANDOM
         }
         val choiceNodes = nodeIds.filter { nodes[it]?.type == NodeType.CHOICE }
         val endingNodes = nodeIds.filter { nodes[it]?.type == NodeType.END }
@@ -689,6 +717,9 @@ class RandomStoryGenerator(
             is NodeContent.Condition -> content.copy(trueNextNodeId = nextId, falseNextNodeId = nextId)
             is NodeContent.ItemAction -> content.copy(nextNodeId = nextId)
             is NodeContent.VariableAction -> content.copy(nextNodeId = nextId)
+            is NodeContent.Random -> content.copy(
+                branches = content.branches.map { it.copy(nextNodeId = nextId) }
+            )
             else -> return
         }
         nodes[nodeId] = node.copy(content = updatedContent)

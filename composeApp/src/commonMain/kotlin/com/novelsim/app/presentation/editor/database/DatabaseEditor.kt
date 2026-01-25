@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.unit.dp
 import com.novelsim.app.presentation.editor.EditorScreenModel
 import com.novelsim.app.data.model.Character
+import com.novelsim.app.presentation.editor.components.StatInput
 
 /**
  * 数据库编辑器主界面
@@ -27,7 +28,7 @@ fun DatabaseEditor(
     screenModel: EditorScreenModel
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物")
+    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物", "道具")
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -68,6 +69,7 @@ fun DatabaseEditor(
                     3 -> ClueEditor(screenModel)
                     4 -> FactionEditor(screenModel)
                     5 -> EnemyEditor(screenModel)
+                    6 -> ItemEditor(screenModel)
                 }
             }
         }
@@ -328,27 +330,6 @@ fun CharacterDetailEditor(
     }
 }
 
-@Composable
-fun StatInput(
-    label: String, 
-    value: Int, 
-    modifier: Modifier = Modifier,
-    onValueChange: (Int) -> Unit
-) {
-    var text by remember(value) { mutableStateOf(value.toString()) }
-    
-    OutlinedTextField(
-        value = text,
-        onValueChange = { 
-            text = it
-            if (it.isNotEmpty() && it.all { char -> char.isDigit() }) {
-                onValueChange(it.toInt())
-            }
-        },
-        label = { Text(label) },
-        modifier = modifier,
-        singleLine = true
-    )
-}
+
 
 

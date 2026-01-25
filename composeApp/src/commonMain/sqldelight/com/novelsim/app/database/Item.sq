@@ -1,0 +1,36 @@
+-- Item table: stores item definitions (templates)
+CREATE TABLE Item (
+    id TEXT NOT NULL,
+    storyId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    type TEXT NOT NULL,       -- Enum: CONSUMABLE, EQUIPMENT, etc.
+    effectJson TEXT,          -- JSON serialized ItemEffect
+    price INTEGER NOT NULL DEFAULT 0,
+    stackable INTEGER NOT NULL DEFAULT 1, -- Boolean 0/1
+    maxStack INTEGER NOT NULL DEFAULT 99,
+    icon TEXT,
+    PRIMARY KEY (id, storyId),
+    FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+-- Get all items for a story
+getItemsForStory:
+SELECT * FROM Item WHERE storyId = ?;
+
+-- Get single item
+getItemById:
+SELECT * FROM Item WHERE id = ? AND storyId = ?;
+
+-- Insert or replace item
+insertItem:
+INSERT OR REPLACE INTO Item(id, storyId, name, description, type, effectJson, price, stackable, maxStack, icon)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Delete item
+deleteItem:
+DELETE FROM Item WHERE id = ? AND storyId = ?;
+
+-- Delete all items for a story
+deleteItemsForStory:
+DELETE FROM Item WHERE storyId = ?;

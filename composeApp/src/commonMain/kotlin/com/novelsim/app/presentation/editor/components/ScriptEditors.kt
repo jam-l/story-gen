@@ -130,7 +130,8 @@ fun VariableEditor(
         HorizontalDivider()
         
         // 下一节点
-        NodeSelectorSimple(
+        // 下一节点
+        NodeSelector(
             label = "执行后跳转到",
             selectedNodeId = content.nextNodeId,
             availableNodes = availableNodes,
@@ -257,7 +258,7 @@ fun BattleEditor(
             fontWeight = FontWeight.Bold
         )
         
-        NodeSelectorSimple(
+        NodeSelector(
             label = "胜利后跳转到",
             selectedNodeId = content.winNextNodeId,
             availableNodes = availableNodes,
@@ -266,7 +267,7 @@ fun BattleEditor(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        NodeSelectorSimple(
+        NodeSelector(
             label = "失败后跳转到",
             selectedNodeId = content.loseNextNodeId,
             availableNodes = availableNodes,
@@ -368,7 +369,8 @@ fun ItemActionEditor(
         HorizontalDivider()
         
         // 下一节点
-        NodeSelectorSimple(
+        // 下一节点
+        NodeSelector(
             label = "执行后跳转到",
             selectedNodeId = content.nextNodeId,
             availableNodes = availableNodes,
@@ -377,73 +379,94 @@ fun ItemActionEditor(
     }
 }
 
+
 /**
- * 简化版节点选择器
+ * 随机分支编辑器
  */
 @Composable
-fun NodeSelectorSimple(
-    label: String,
-    selectedNodeId: String,
+fun RandomEditor(
+    content: NodeContent.Random,
     availableNodes: List<StoryNode>,
-    onNodeSelect: (String) -> Unit
+    onContentChange: (NodeContent) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedNode = availableNodes.find { it.id == selectedNodeId }
-    
-    Column {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "随机分支列表 (总权重: ${content.branches.sumOf { it.weight }})",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(4.dp))
         
-        Box {
-            OutlinedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = true }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (selectedNodeId.isEmpty()) "未选择" else selectedNodeId,
-                        color = if (selectedNodeId.isEmpty()) 
-                            MaterialTheme.colorScheme.onSurfaceVariant 
-                        else 
-                            MaterialTheme.colorScheme.onSurface
-                    )
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                }
-            }
-            
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("无 (清除选择)") },
-                    onClick = {
-                        onNodeSelect("")
-                        expanded = false
-                    }
+        content.branches.forEachIndexed { index, branch ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
-                HorizontalDivider()
-                availableNodes.forEach { node ->
-                    DropdownMenuItem(
-                        text = { Text("${node.id} (${node.type.name})") },
-                        onClick = {
-                            onNodeSelect(node.id)
-                            expanded = false
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "分支 ${index + 1}",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        IconButton(
+                            onClick = {
+                                val newBranches = content.branches.toMutableList().apply { removeAt(index) }
+                                onContentChange(content.copy(branches = newBranches))
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "删除分支")
+                        }
+                    }
+                    
+                    // 权重
+                    OutlinedTextField(
+                        value = branch.weight.toString(),
+                        onValueChange = { 
+                            val w = it.toIntOrNull() ?: 0
+                            val newBranches = content.branches.toMutableList()
+                            newBranches[index] = branch.copy(weight = w.coerceAtLeast(0))
+                            onContentChange(content.copy(branches = newBranches))
+                        },
+                        label = { Text("权重 (概率)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 跳转目标
+                    NodeSelector(
+                        label = "跳转到",
+                        selectedNodeId = branch.nextNodeId,
+                        availableNodes = availableNodes,
+                        onNodeSelect = { nodeId ->
+                            val newBranches = content.branches.toMutableList()
+                            newBranches[index] = branch.copy(nextNodeId = nodeId)
+                            onContentChange(content.copy(branches = newBranches))
                         }
                     )
                 }
             }
         }
+        
+        OutlinedButton(
+            onClick = {
+                val newBranches = content.branches + RandomBranch(nextNodeId = "", weight = 10)
+                onContentChange(content.copy(branches = newBranches))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("添加随机分支")
+        }
     }
 }
+
