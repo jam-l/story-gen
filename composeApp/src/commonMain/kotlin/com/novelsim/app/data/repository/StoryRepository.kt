@@ -156,7 +156,8 @@ class StoryRepository(
                     description = enemy.description,
                     statsJson = json.encodeToString(enemy.stats),
                     expReward = enemy.expReward.toLong(),
-                    goldReward = enemy.goldReward.toLong()
+                    goldReward = enemy.goldReward.toLong(),
+                    variablesJson = json.encodeToString(enemy.variables)
                 )
             }
             
@@ -172,7 +173,8 @@ class StoryRepository(
                     price = item.price.toLong(),
                     stackable = if (item.stackable) 1L else 0L,
                     maxStack = item.maxStack.toLong(),
-                    icon = item.icon
+                    icon = item.icon,
+                    variablesJson = json.encodeToString(item.variables)
                 )
             }
             
@@ -187,7 +189,8 @@ class StoryRepository(
                     baseStatsJson = json.encodeToString(character.baseStats),
                     factionId = character.factionId,
                     relationshipsJson = json.encodeToString(character.relationships),
-                    tagsJson = json.encodeToString(character.tags)
+                    tagsJson = json.encodeToString(character.tags),
+                    variablesJson = json.encodeToString(character.variables)
                 )
             }
             
@@ -201,7 +204,8 @@ class StoryRepository(
                     background = location.background,
                     connectedLocationIdsJson = json.encodeToString(location.connectedLocationIds),
                     npcsJson = json.encodeToString(location.npcs),
-                    eventsJson = json.encodeToString(location.events)
+                    eventsJson = json.encodeToString(location.events),
+                    variablesJson = json.encodeToString(location.variables)
                 )
             }
 
@@ -237,7 +241,8 @@ class StoryRepository(
                     storyId = story.id,
                     name = faction.name,
                     description = faction.description,
-                    reputation = faction.reputation.toLong()
+                    reputation = faction.reputation.toLong(),
+                    variablesJson = json.encodeToString(faction.variables)
                 )
             }
         }
