@@ -7,7 +7,7 @@
       "parts": {
         "surname": {
           "file": "cnname.json",
-          "path": "danxing",
+          "path": "xing",
           "weight": 90
         },
         "given": {
@@ -46,7 +46,7 @@
       "parts": {
         "surname": {
           "file": "cnname.json",
-          "path": "danxing"
+          "path": "xing"
         },
         "given": {
           "file": "cnname.json",
@@ -68,12 +68,31 @@
     },
     {
       "id": "english_name",
-      "pattern": "{name}",
-      "description": "英文名",
+      "pattern": "{given}{name}",
+      "description": "英文男名",
       "parts": {
         "name": {
           "file": "enname.json",
-          "path": "enname"
+          "path": "enxingzh"
+        },
+        "given": {
+          "file": "enname.json",
+          "path": "ennamezhmale"
+        }
+      }
+    },
+    {
+      "id": "english_name_female",
+      "pattern": "{given}{name}",
+      "description": "英文女名",
+      "parts": {
+        "name": {
+          "file": "enname.json",
+          "path": "enxingzh"
+        },
+        "given": {
+          "file": "enname.json",
+          "path": "ennamezhfemale"
         }
       }
     },

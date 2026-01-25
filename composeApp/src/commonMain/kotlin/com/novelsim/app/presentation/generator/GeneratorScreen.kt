@@ -31,8 +31,14 @@ class GeneratorScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         // Simple ScreenModel for Generator logic
         val screenModel = koinScreenModel<GeneratorScreenModel>()
+        var loadedTemplates by remember { mutableStateOf<List<com.novelsim.app.data.source.NameTemplate>>(emptyList()) }
+        
+        LaunchedEffect(Unit) {
+            loadedTemplates = screenModel.loadTemplates()
+        }
         
         GeneratorScreenContent(
+            allTemplates = loadedTemplates,
             onBack = { navigator.pop() },
             onGenerate = { config, title ->
                 screenModel.generateAndSave(config, title) { storyId ->
@@ -88,11 +94,25 @@ class GeneratorScreenModel(
             onSuccess(finalStory.id)
         }
     }
+    
+    suspend fun loadTemplates(): List<com.novelsim.app.data.source.NameTemplate> {
+        val nameProvider = com.novelsim.app.data.source.RandomNameProvider()
+        try {
+            nameProvider.initialize { fileName ->
+                @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
+                novelsimulator.composeapp.generated.resources.Res.readBytes("files/$fileName").decodeToString()
+            }
+        } catch (e: Exception) {
+            println("Failed to load name provider for templates: ${e.message}")
+        }
+        return nameProvider.getTemplates()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GeneratorScreenContent(
+    allTemplates: List<com.novelsim.app.data.source.NameTemplate>,
     onBack: () -> Unit,
     onGenerate: (RandomStoryGenerator.GeneratorConfig, String) -> Unit
 ) {
@@ -111,13 +131,74 @@ private fun GeneratorScreenContent(
     var conditionProbability by remember { mutableStateOf(0.15f) }
     var itemProbability by remember { mutableStateOf(0.1f) }
     
+    // Core Elements Config
+    var minItems by remember { mutableStateOf(2f) }
+    var maxItems by remember { mutableStateOf(5f) }
+    var minVariables by remember { mutableStateOf(2f) }
+    var maxVariables by remember { mutableStateOf(5f) }
+    var minEnemies by remember { mutableStateOf(2f) }
+    var maxEnemies by remember { mutableStateOf(5f) }
+    
+    var minCharacters by remember { mutableStateOf(3f) }
+    var maxCharacters by remember { mutableStateOf(6f) }
+    
+    var minLocations by remember { mutableStateOf(3f) }
+    var maxLocations by remember { mutableStateOf(6f) }
+    
+    var minEvents by remember { mutableStateOf(2f) }
+    var maxEvents by remember { mutableStateOf(4f) }
+    
+    var minClues by remember { mutableStateOf(2f) }
+    var maxClues by remember { mutableStateOf(5f) }
+    
+    var minFactions by remember { mutableStateOf(2f) }
+    var maxFactions by remember { mutableStateOf(4f) }
+    
     // New Params
     var chaos by remember { mutableStateOf(0.1f) }
     var difficulty by remember { mutableStateOf(0.5f) }
     
     var selectedTheme by remember { mutableStateOf(RandomStoryGenerator.StoryTheme.FANTASY) }
+    var selectedNamingStyle by remember { mutableStateOf(RandomStoryGenerator.NamingStyle.AUTO) }
     var useSeed by remember { mutableStateOf(false) }
     var seed by remember { mutableStateOf("") }
+    
+    // Loaded Templates
+    // allTemplates passed from parent
+    var selectedItemTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedEnemyTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedCharacterTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedLocationTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedEventTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedClueTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedFactionTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    
+    LaunchedEffect(allTemplates) {
+        // Default selections (intelligent defaults) if not already selected
+        if (allTemplates.isNotEmpty()) {
+            if (selectedItemTemplates.isEmpty()) {
+                selectedItemTemplates = allTemplates.filter { it.id.contains("item") || it.id.contains("equipment") || it.id.contains("treasure") }.map { it.id }.toSet()
+            }
+            if (selectedEnemyTemplates.isEmpty()) {
+                selectedEnemyTemplates = allTemplates.filter { it.id.contains("monster") || it.id.contains("enemy") }.map { it.id }.toSet()
+            }
+            if (selectedCharacterTemplates.isEmpty()) {
+                 selectedCharacterTemplates = allTemplates.filter { it.id.contains("character") || it.id.contains("name") }.map { it.id }.toSet()
+            }
+            if (selectedLocationTemplates.isEmpty()) {
+                 selectedLocationTemplates = allTemplates.filter { it.id.contains("place") || it.id.contains("location") }.map { it.id }.toSet()
+            }
+            if (selectedEventTemplates.isEmpty()) {
+                 selectedEventTemplates = allTemplates.filter { it.id.contains("event") }.map { it.id }.toSet()
+            }
+             if (selectedClueTemplates.isEmpty()) {
+                 selectedClueTemplates = allTemplates.filter { it.id.contains("clue") || it.id.contains("item") }.map { it.id }.toSet()
+            }
+            if (selectedFactionTemplates.isEmpty()) {
+                 selectedFactionTemplates = allTemplates.filter { it.id.contains("faction") || it.id.contains("org") || it.id.contains("sect") || it.id.contains("skill") }.map { it.id }.toSet()
+            }
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -147,9 +228,33 @@ private fun GeneratorScreenContent(
                         battleProbability = battleProbability,
                         conditionProbability = conditionProbability,
                         itemProbability = itemProbability,
+                        minRandomItems = minItems.toInt(),
+                        maxRandomItems = maxItems.toInt(),
+                        minRandomVariables = minVariables.toInt(),
+                        maxRandomVariables = maxVariables.toInt(),
+                        minRandomEnemies = minEnemies.toInt(),
+                        maxRandomEnemies = maxEnemies.toInt(),
+                        minRandomCharacters = minCharacters.toInt(),
+                        maxRandomCharacters = maxCharacters.toInt(),
+                        minRandomLocations = minLocations.toInt(),
+                        maxRandomLocations = maxLocations.toInt(),
+                        minRandomEvents = minEvents.toInt(),
+                        maxRandomEvents = maxEvents.toInt(),
+                        minRandomClues = minClues.toInt(),
+                        maxRandomClues = maxClues.toInt(),
+                        minRandomFactions = minFactions.toInt(),
+                        maxRandomFactions = maxFactions.toInt(),
                         chaos = chaos,
                         difficulty = difficulty,
                         theme = selectedTheme,
+                        namingStyle = selectedNamingStyle,
+                        itemTemplateIds = selectedItemTemplates.toList(),
+                        enemyTemplateIds = selectedEnemyTemplates.toList(),
+                        characterTemplateIds = selectedCharacterTemplates.toList(),
+                        locationTemplateIds = selectedLocationTemplates.toList(),
+                        eventTemplateIds = selectedEventTemplates.toList(),
+                        clueTemplateIds = selectedClueTemplates.toList(),
+                        factionTemplateIds = selectedFactionTemplates.toList(),
                         seed = if (useSeed) seed.toLongOrNull() else null
                     )
                     onGenerate(config, title)
@@ -189,13 +294,35 @@ private fun GeneratorScreenContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Chips row might overflow, let's just show a few or use FlowRow if available
-                        // Or just a simple Row with weight
-                         RandomStoryGenerator.StoryTheme.entries.forEach { theme ->
+                        RandomStoryGenerator.StoryTheme.entries.forEach { theme ->
                             FilterChip(
                                 selected = selectedTheme == theme,
                                 onClick = { selectedTheme = theme },
                                 label = { Text(getThemeName(theme)) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("命名风格", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        RandomStoryGenerator.NamingStyle.entries.forEach { style ->
+                            FilterChip(
+                                selected = selectedNamingStyle == style,
+                                onClick = { selectedNamingStyle = style },
+                                label = { 
+                                    Text(when(style) {
+                                        RandomStoryGenerator.NamingStyle.AUTO -> "自动"
+                                        RandomStoryGenerator.NamingStyle.CHINESE -> "中文"
+                                        RandomStoryGenerator.NamingStyle.WESTERN -> "西方"
+                                    })
+                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -319,6 +446,166 @@ private fun GeneratorScreenContent(
                 }
             }
             
+            // Core Elements Generation
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("核心元素生成", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    SliderControl("随机道具模板", "${minItems.toInt()} - ${maxItems.toInt()}") {
+                        RangeSlider(
+                            value = minItems..maxItems,
+                            onValueChange = { 
+                                minItems = it.start
+                                maxItems = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+                    
+                    SliderControl("随机变量", "${minVariables.toInt()} - ${maxVariables.toInt()}") {
+                        RangeSlider(
+                            value = minVariables..maxVariables,
+                            onValueChange = { 
+                                minVariables = it.start
+                                maxVariables = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+                    
+                    SliderControl("随机敌人模板", "${minEnemies.toInt()} - ${maxEnemies.toInt()}") {
+                        RangeSlider(
+                            value = minEnemies..maxEnemies,
+                            onValueChange = { 
+                                minEnemies = it.start
+                                maxEnemies = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+                    
+                    SliderControl("随机角色数量", "${minCharacters.toInt()} - ${maxCharacters.toInt()}") {
+                        RangeSlider(
+                            value = minCharacters..maxCharacters,
+                            onValueChange = { 
+                                minCharacters = it.start
+                                maxCharacters = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+
+                    SliderControl("随机地点数量", "${minLocations.toInt()} - ${maxLocations.toInt()}") {
+                        RangeSlider(
+                            value = minLocations..maxLocations,
+                            onValueChange = { 
+                                minLocations = it.start
+                                maxLocations = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+
+                    SliderControl("随机事件数量", "${minEvents.toInt()} - ${maxEvents.toInt()}") {
+                        RangeSlider(
+                            value = minEvents..maxEvents,
+                            onValueChange = { 
+                                minEvents = it.start
+                                maxEvents = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+
+                    SliderControl("随机线索数量", "${minClues.toInt()} - ${maxClues.toInt()}") {
+                        RangeSlider(
+                            value = minClues..maxClues,
+                            onValueChange = { 
+                                minClues = it.start
+                                maxClues = it.endInclusive
+                            },
+                            valueRange = 0f..20f,
+                            steps = 19
+                        )
+                    }
+
+                    SliderControl("随机阵营数量", "${minFactions.toInt()} - ${maxFactions.toInt()}") {
+                        RangeSlider(
+                            value = minFactions..maxFactions,
+                            onValueChange = { 
+                                minFactions = it.start
+                                maxFactions = it.endInclusive
+                            },
+                            valueRange = 0f..10f,
+                            steps = 9
+                        )
+                    }
+                    
+                    if (allTemplates.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text("名称模板选择", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        
+                        Text("道具生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("item") || it.id.contains("equipment") },
+                            selectedIds = selectedItemTemplates,
+                            onSelectionChange = { selectedItemTemplates = it }
+                        )
+
+                        Text("敌人生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("monster") || it.id.contains("enemy") },
+                            selectedIds = selectedEnemyTemplates,
+                            onSelectionChange = { selectedEnemyTemplates = it }
+                        )
+                        
+                        Text("角色生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("character") || it.id.contains("name") },
+                            selectedIds = selectedCharacterTemplates,
+                            onSelectionChange = { selectedCharacterTemplates = it }
+                        )
+                        
+                        Text("地点生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("place") || it.id.contains("location") },
+                            selectedIds = selectedLocationTemplates,
+                            onSelectionChange = { selectedLocationTemplates = it }
+                        )
+                        
+                        Text("事件生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("event") },
+                            selectedIds = selectedEventTemplates,
+                            onSelectionChange = { selectedEventTemplates = it }
+                        )
+                        
+                        Text("线索生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("clue") },
+                            selectedIds = selectedClueTemplates,
+                            onSelectionChange = { selectedClueTemplates = it }
+                        )
+                        
+                        Text("阵营生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                        TemplateSelector(
+                            templates = allTemplates.filter { it.id.contains("faction") || it.id.contains("skill") },
+                            selectedIds = selectedFactionTemplates,
+                            onSelectionChange = { selectedFactionTemplates = it }
+                        )
+                    }
+                }
+            }
+            
             // Seed
              Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -380,6 +667,36 @@ private fun ProbabilityControl(
             onValueChange = onValueChange,
             valueRange = 0f..0.5f
         )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TemplateSelector(
+    templates: List<com.novelsim.app.data.source.NameTemplate>,
+    selectedIds: Set<String>,
+    onSelectionChange: (Set<String>) -> Unit
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        templates.forEach { template ->
+            FilterChip(
+                selected = selectedIds.contains(template.id),
+                onClick = {
+                    val newSelection = selectedIds.toMutableSet()
+                    if (newSelection.contains(template.id)) {
+                        newSelection.remove(template.id)
+                    } else {
+                        newSelection.add(template.id)
+                    }
+                    onSelectionChange(newSelection)
+                },
+                label = { Text(template.description.ifEmpty { template.id }) }
+            )
+        }
     }
 }
 

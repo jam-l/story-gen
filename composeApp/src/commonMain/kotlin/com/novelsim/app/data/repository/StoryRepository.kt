@@ -102,6 +102,14 @@ class StoryRepository(
             enemies = enemyQueries.getEnemiesForStory(storyId).executeAsList().map { it.toEnemy() },
             // 从独立表加载物品
             items = itemQueries.getItemsForStory(storyId).executeAsList().map { it.toItem() },
+            
+            // 加载其他核心元素
+            characters = characterQueries.getCharactersForStory(storyId).executeAsList().map { it.toCharacter() },
+            locations = locationQueries.getLocationsForStory(storyId).executeAsList().map { it.toLocation() },
+            events = eventQueries.getEventsForStory(storyId).executeAsList().map { it.toGameEvent() },
+            clues = clueQueries.getCluesForStory(storyId).executeAsList().map { it.toClue() },
+            factions = factionQueries.getFactionsForStory(storyId).executeAsList().map { it.toFaction() },
+            
             createdAt = dbStory.createdAt,
             updatedAt = dbStory.updatedAt
         )
@@ -165,6 +173,71 @@ class StoryRepository(
                     stackable = if (item.stackable) 1L else 0L,
                     maxStack = item.maxStack.toLong(),
                     icon = item.icon
+                )
+            }
+            
+            // 批量保存角色
+            story.characters.forEach { character ->
+                characterQueries.insertCharacter(
+                    id = character.id,
+                    storyId = story.id,
+                    name = character.name,
+                    description = character.description,
+                    avatar = character.avatar,
+                    baseStatsJson = json.encodeToString(character.baseStats),
+                    factionId = character.factionId,
+                    relationshipsJson = json.encodeToString(character.relationships),
+                    tagsJson = json.encodeToString(character.tags)
+                )
+            }
+            
+            // 批量保存地点
+            story.locations.forEach { location ->
+                 locationQueries.insertLocation(
+                    id = location.id,
+                    storyId = story.id,
+                    name = location.name,
+                    description = location.description,
+                    background = location.background,
+                    connectedLocationIdsJson = json.encodeToString(location.connectedLocationIds),
+                    npcsJson = json.encodeToString(location.npcs),
+                    eventsJson = json.encodeToString(location.events)
+                )
+            }
+
+            // 批量保存事件
+            story.events.forEach { event ->
+                eventQueries.insertEvent(
+                    id = event.id,
+                    storyId = story.id,
+                    name = event.name,
+                    description = event.description,
+                    startNodeId = event.startNodeId,
+                    triggerCondition = event.triggerCondition,
+                    priority = event.priority.toLong(),
+                    isRepeatable = if (event.isRepeatable) 1L else 0L
+                )
+            }
+            
+            // 批量保存线索
+            story.clues.forEach { clue ->
+                clueQueries.insertClue(
+                    id = clue.id,
+                    storyId = story.id,
+                    name = clue.name,
+                    description = clue.description,
+                    isKnown = if (clue.isKnown) 1L else 0L
+                )
+            }
+
+            // 批量保存阵营
+            story.factions.forEach { faction ->
+                factionQueries.insertFaction(
+                    id = faction.id,
+                    storyId = story.id,
+                    name = faction.name,
+                    description = faction.description,
+                    reputation = faction.reputation.toLong()
                 )
             }
         }

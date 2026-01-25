@@ -77,6 +77,10 @@ class RandomNameProvider(
         }
     }
     
+    fun getTemplates(): List<NameTemplate> {
+        return rules?.templates ?: emptyList()
+    }
+    
     /**
      * 生成随机名称
      * @param templateId 模板ID (如 "chinese_name_male", "place_name")
@@ -113,6 +117,14 @@ class RandomNameProvider(
     suspend fun getEquipmentName(type: String = "sword"): String = generate("equipment_$type")
 
     suspend fun getEnglishName(): String = generate("english_name")
+    
+    suspend fun getVariableName(): String = generate("variable_name")
+    
+    suspend fun getEnemyName(type: String? = null): String {
+        return if (type != null) generate("enemy_$type") else generate("enemy_generic")
+    }
+    
+    suspend fun getItemName(type: String): String = generate("item_$type")
     
     suspend fun getOtherName(category: String): String {
         // 尝试直接使用 category 作为模板 ID，或者查找数据

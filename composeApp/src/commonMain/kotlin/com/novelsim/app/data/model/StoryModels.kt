@@ -275,7 +275,12 @@ data class Story(
     val enemies: List<Enemy> = emptyList(),
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
-    val customItems: List<ItemInstance> = emptyList()
+    val customItems: List<ItemInstance> = emptyList(),
+    val characters: List<Character> = emptyList(),
+    val locations: List<Location> = emptyList(),
+    val events: List<GameEvent> = emptyList(),
+    val clues: List<Clue> = emptyList(),
+    val factions: List<Faction> = emptyList()
 )
 
 /**

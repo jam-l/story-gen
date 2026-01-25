@@ -48,6 +48,38 @@ class RandomStoryGenerator(
         val minEndings: Int = 1,
         val maxEndings: Int = 3,
         
+        /** 随机生成道具数量 (Item Templates) */
+        val minRandomItems: Int = 2,
+        val maxRandomItems: Int = 5,
+        
+        /** 随机生成变量数量 */
+        val minRandomVariables: Int = 2,
+        val maxRandomVariables: Int = 5,
+        
+        /** 随机生成敌人数量 */
+        val minRandomEnemies: Int = 2,
+        val maxRandomEnemies: Int = 5,
+
+        /** 随机生成角色数量 */
+        val minRandomCharacters: Int = 3,
+        val maxRandomCharacters: Int = 6,
+
+        /** 随机生成地点数量 */
+        val minRandomLocations: Int = 3,
+        val maxRandomLocations: Int = 6,
+
+        /** 随机生成事件数量 */
+        val minRandomEvents: Int = 2,
+        val maxRandomEvents: Int = 4,
+
+        /** 随机生成线索数量 */
+        val minRandomClues: Int = 2,
+        val maxRandomClues: Int = 5,
+
+        /** 随机生成阵营数量 */
+        val minRandomFactions: Int = 2,
+        val maxRandomFactions: Int = 4,
+        
         /** 故事主题 */
         val theme: StoryTheme = StoryTheme.FANTASY,
         
@@ -61,7 +93,33 @@ class RandomStoryGenerator(
         val generateEnding: Boolean = true,
         
         /** 随机种子（null 表示随机） */
-        val seed: Long? = null
+        /** 随机种子（null 表示随机） */
+        val seed: Long? = null,
+        
+        /** 命名风格 */
+        val namingStyle: NamingStyle = NamingStyle.AUTO,
+        
+        /** 选用的道具命名模板 ID 列表 */
+        val itemTemplateIds: List<String> = emptyList(),
+        
+        /** 选用的敌人命名模板 ID 列表 */
+        /** 选用的敌人命名模板 ID 列表 */
+        val enemyTemplateIds: List<String> = emptyList(),
+
+        /** 选用的角色命名模板 ID 列表 */
+        val characterTemplateIds: List<String> = emptyList(),
+
+        /** 选用的地点命名模板 ID 列表 */
+        val locationTemplateIds: List<String> = emptyList(),
+
+        /** 选用的事件命名模板 ID 列表 */
+        val eventTemplateIds: List<String> = emptyList(),
+        
+        /** 选用的线索命名模板 ID 列表 */
+        val clueTemplateIds: List<String> = emptyList(),
+
+        /** 选用的阵营命名模板 ID 列表 */
+        val factionTemplateIds: List<String> = emptyList()
     )
     
     /**
@@ -73,6 +131,15 @@ class RandomStoryGenerator(
         MYSTERY,    // 悬疑
         ROMANCE,    // 言情
         HORROR      // 恐怖
+    }
+    
+    /**
+     * 命名风格
+     */
+    enum class NamingStyle {
+        AUTO,       // 自动 (根据主题)
+        CHINESE,    // 中文风格
+        WESTERN     // 西方风格
     }
     
     private val random = config.seed?.let { Random(it) } ?: Random.Default
@@ -268,8 +335,21 @@ class RandomStoryGenerator(
         val customItems = mutableListOf<ItemInstance>()
         val enemies = mutableListOf<Enemy>()
         
+        // 0. 生成核心元素 (道具、变量、敌人、角色、地点、阵营)
+        val generatedItems = generateRandomItems()
+        val generatedVariables = generateRandomVariables()
+        // 敌人通常随后续节点生成，但也可以预先生成一些
+        val preGeneratedEnemies = generateRandomEnemies()
+        enemies.addAll(preGeneratedEnemies)
+        
+        val generatedCharacters = generateRandomCharacters()
+        val generatedLocations = generateRandomLocations()
+        val generatedFactions = generateRandomFactions()
+        val generatedEvents = generateRandomEvents()
+        val generatedClues = generateRandomClues()
+        
         // 1. 创建开始节点
-        val startNode = createDialogueNode("start", 100f, 100f)
+        val startNode = createDialogueNode("start", 100f, 100f, generatedCharacters)
         nodes[startNode.id] = startNode
         nodeIds.add(startNode.id)
         
@@ -293,12 +373,13 @@ class RandomStoryGenerator(
             }
             
             val node = when (nodeType) {
-                NodeType.BATTLE -> createBattleNode(nodeId, currentX, currentY, enemies)
-                NodeType.CONDITION -> createConditionNode(nodeId, currentX, currentY)
-                NodeType.ITEM -> createItemNode(nodeId, currentX, currentY, customItems)
-                NodeType.VARIABLE -> createVariableNode(nodeId, currentX, currentY)
+                // Pass generated lists to node creators to avoid hardcoding
+                NodeType.BATTLE -> createBattleNode(nodeId, currentX, currentY, enemies, preGeneratedEnemies)
+                NodeType.CONDITION -> createConditionNode(nodeId, currentX, currentY, generatedVariables)
+                NodeType.ITEM -> createItemNode(nodeId, currentX, currentY, customItems, generatedItems)
+                NodeType.VARIABLE -> createVariableNode(nodeId, currentX, currentY, generatedVariables)
                 NodeType.RANDOM -> createRandomNode(nodeId, currentX, currentY)
-                else -> createDialogueNode(nodeId, currentX, currentY)
+                else -> createDialogueNode(nodeId, currentX, currentY, generatedCharacters)
             }
             
             nodes[node.id] = node
@@ -340,28 +421,316 @@ class RandomStoryGenerator(
             nodes = nodes,
             createdAt = PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis(),
+            items = generatedItems,
+            variables = generatedVariables,
             customItems = customItems,
-            enemies = enemies
+            enemies = enemies,
+            characters = generatedCharacters,
+            locations = generatedLocations,
+            factions = generatedFactions,
+            events = generatedEvents,
+            clues = generatedClues
         )
     }
 
+    private suspend fun generateRandomItems(): List<Item> {
+        val count = random.nextInt(config.minRandomItems, config.maxRandomItems + 1)
+        val items = mutableListOf<Item>()
+        
+        // Use user selected templates
+        val selectedIds = config.itemTemplateIds
+        
+        // Fallback types if no templates
+        val defaultTypes = listOf(ItemType.CONSUMABLE, ItemType.EQUIPMENT, ItemType.MATERIAL, ItemType.KEY_ITEM)
+        
+        for (i in 0 until count) {
+            val id = "item_${PlatformUtils.getCurrentTimeMillis()}_$i"
+            var name = "随机道具 $i"
+            var type = defaultTypes.random(random)
+            var description = "这是一个随机生成的物品"
+            
+            if (selectedIds.isNotEmpty()) {
+                val templateId = selectedIds.random(random)
+                name = nameProvider?.generate(templateId) ?: name
+                
+                // Infer type from template ID (simple heuristic for consistency)
+                type = when {
+                    templateId.contains("equipment") || templateId.contains("sword") || templateId.contains("blade") -> ItemType.EQUIPMENT
+                    templateId.contains("treasure") -> ItemType.MATERIAL
+                    templateId.contains("key") -> ItemType.KEY_ITEM
+                    else -> defaultTypes.random(random)
+                }
+                
+                // We don't have description in template directly unless we fetch it back, but nameProvider.generate returns String.
+                // We can't easy get description here without fetching template object.
+                // But user just wants name.
+            }
+            
+            items.add(
+                Item(
+                    id = id,
+                    name = name,
+                    description = description,
+                    type = type,
+                    // removed rarity
+                    icon = null, // 无图标
+                    price = random.nextInt(10, 500)
+                )
+            )
+        }
+        return items
+    }
 
+    private suspend fun generateRandomVariables(): Map<String, String> {
+        val count = random.nextInt(config.minRandomVariables, config.maxRandomVariables + 1)
+        val variables = mutableMapOf<String, String>()
+        val commonVars = listOf("honor", "karma", "sanity", "mana", "stamina", "charm")
+        
+        // 预设一些必然存在的变量
+        variables["gold"] = "0"
+        variables["exp"] = "0"
+        variables["level"] = "1"
+        
+        for (i in 0 until count) {
+             var name = "var_${random.nextInt(1000)}"
+             
+             if (nameProvider != null) {
+                 // 尝试使用 NameProvider 生成
+                 val randomName = nameProvider.getVariableName()
+                 if (!randomName.startsWith("未知模板")) {
+                     name = randomName
+                 } else {
+                     // Fallback to common vars if template missing
+                     if (i < commonVars.size && random.nextBoolean()) {
+                         name = commonVars[i] + "_$i"
+                     }
+                 }
+             } else {
+                 if (i < commonVars.size && random.nextBoolean()) {
+                     name = commonVars[i] + "_$i"
+                 }
+             }
+             
+             // 确保变量名唯一 (简单处理，追加后缀)
+             if (variables.containsKey(name)) {
+                 name = "${name}_$i"
+             }
+             
+             variables[name] = if (random.nextBoolean()) "0" else random.nextInt(100).toString()
+        }
+        return variables
+    }
 
-    private suspend fun createDialogueNode(id: String, x: Float, y: Float): StoryNode {
+    private suspend fun generateRandomEnemies(): List<Enemy> {
+        val count = random.nextInt(config.minRandomEnemies, config.maxRandomEnemies + 1)
+        val enemies = mutableListOf<Enemy>()
+        
+        // Use user selected templates
+        val selectedIds = config.enemyTemplateIds
+        
+        for (i in 0 until count) {
+            val id = "enemy_${PlatformUtils.getCurrentTimeMillis()}_$i"
+            
+            var name = "随机怪物" // default
+            var description = "一只危险的生物"
+            
+            if (selectedIds.isNotEmpty()) {
+                val templateId = selectedIds.random(random)
+                name = nameProvider?.generate(templateId) ?: name
+            } else {
+                 val fallbackTemplates = listOf("slime", "goblin", "wolf", "orc", "ghost")
+                 name = fallbackTemplates.random(random)
+            }
+            
+            enemies.add(
+                 Enemy(
+                    id = id,
+                    name = name,
+                    description = description,
+                    stats = CharacterStats(
+                        maxHp = random.nextInt(50, 200),
+                        currentHp = random.nextInt(50, 200),
+                        attack = random.nextInt(5, 20),
+                        defense = random.nextInt(0, 10),
+                        speed = random.nextInt(5, 15)
+                    ),
+                    expReward = random.nextInt(10, 50),
+                    goldReward = random.nextInt(5, 20)
+                )
+            )
+        }
+        return enemies
+    }
+
+    private suspend fun generateRandomCharacters(): List<Character> {
+        val count = random.nextInt(config.minRandomCharacters, config.maxRandomCharacters + 1)
+        val characters = mutableListOf<Character>()
+        
+        for (i in 0 until count) {
+            var name = "角色 $i"
+            if (nameProvider != null) {
+                // Use configured template if available
+                if (config.characterTemplateIds.isNotEmpty()) {
+                    name = nameProvider.generate(config.characterTemplateIds.random(random))
+                } else {
+                    val useChinese = when (config.namingStyle) {
+                        NamingStyle.CHINESE -> true
+                        NamingStyle.WESTERN -> false
+                        NamingStyle.AUTO -> when(config.theme) {
+                            StoryTheme.FANTASY, StoryTheme.MYSTERY, StoryTheme.ROMANCE -> true
+                            else -> false
+                        }
+                    }
+                    name = if (useChinese) nameProvider.getChineseName() else nameProvider.getEnglishName()
+                }
+            }
+            
+            characters.add(Character(
+                id = "char_${PlatformUtils.getCurrentTimeMillis()}_$i",
+                name = name,
+                description = "这是一个随机生成的角色",
+                baseStats = CharacterStats(
+                     maxHp = random.nextInt(80, 150),
+                     currentHp = random.nextInt(80, 150),
+                     attack = random.nextInt(10, 30),
+                     defense = random.nextInt(5, 15),
+                     speed = random.nextInt(8, 18)
+                )
+            ))
+        }
+        return characters
+    }
+    
+    private suspend fun generateRandomLocations(): List<Location> {
+        val count = random.nextInt(config.minRandomLocations, config.maxRandomLocations + 1)
+        val locations = mutableListOf<Location>()
+        
+        for (i in 0 until count) {
+            var name = "地点 $i"
+            if (nameProvider != null) {
+                 if (config.locationTemplateIds.isNotEmpty()) {
+                     name = nameProvider.generate(config.locationTemplateIds.random(random))
+                 } else {
+                     // Try to use place_name template if available
+                     name = nameProvider.generate("place_name")
+                     if (name.startsWith("未知模板")) name = "神秘地点 $i"
+                 }
+            }
+            
+            locations.add(Location(
+                id = "loc_${PlatformUtils.getCurrentTimeMillis()}_$i",
+                name = name,
+                description = "这是一个随机生成的地点"
+            ))
+        }
+        return locations
+    }
+    
+    private suspend fun generateRandomFactions(): List<Faction> {
+        val count = random.nextInt(config.minRandomFactions, config.maxRandomFactions + 1)
+        val factions = mutableListOf<Faction>()
+        
+        for (i in 0 until count) {
+             var name = "阵营 $i"
+             // Use martial arts prefix as faction name if possible?
+             // Or just place name + "派"
+             if (nameProvider != null) {
+                  if (config.factionTemplateIds.isNotEmpty()) {
+                      name = nameProvider.generate(config.factionTemplateIds.random(random))
+                  } else {
+                      // Hack: generate skill name and take prefix if possible, or just use place name
+                      val place = nameProvider.generate("place_name")
+                      name = if (!place.startsWith("未知模板")) "$place 派" else "阵营 $i"
+                  }
+             }
+             
+             factions.add(Faction(
+                 id = "fac_${PlatformUtils.getCurrentTimeMillis()}_$i",
+                 name = name,
+                 description = "随机生成的阵营",
+                 reputation = 0
+             ))
+        }
+        return factions
+    }
+
+    private suspend fun generateRandomEvents(): List<GameEvent> {
+        val count = random.nextInt(config.minRandomEvents, config.maxRandomEvents + 1)
+        val events = mutableListOf<GameEvent>()
+        val templates = listOf("Mysterious Signal", "Alien Invasion", "Ancient Ritual", "Festival of Lights", "Dragon Attack")
+        
+        for (i in 0 until count) {
+            val name = if (nameProvider != null) {
+                 if (config.eventTemplateIds.isNotEmpty()) {
+                     nameProvider.generate(config.eventTemplateIds.random(random))
+                 } else {
+                     // Try to generate a catchy name
+                     // "Legacy of " + something? 
+                     // Simple fallback
+                     "事件: " + templates.random(random)
+                 }
+            } else {
+                 templates.random(random)
+            }
+            
+            events.add(GameEvent(
+                id = "evt_${PlatformUtils.getCurrentTimeMillis()}_$i",
+                name = name,
+                description = "随机生成的事件",
+                startNodeId = "" // Event usually connects to a start node
+            ))
+        }
+        return events
+    }
+    
+    private suspend fun generateRandomClues(): List<Clue> {
+        val count = random.nextInt(config.minRandomClues, config.maxRandomClues + 1)
+        val clues = mutableListOf<Clue>()
+        
+        for (i in 0 until count) {
+             var name = "线索 $i"
+             if (config.clueTemplateIds.isNotEmpty() && nameProvider != null) {
+                 name = nameProvider.generate(config.clueTemplateIds.random(random))
+             }
+             
+             clues.add(Clue(
+                 id = "clue_${PlatformUtils.getCurrentTimeMillis()}_$i",
+                 name = name,
+                 description = "关于故事真相的线索",
+                 isKnown = false
+             ))
+        }
+        return clues
+    }
+
+    private suspend fun createDialogueNode(id: String, x: Float, y: Float, generatedCharacters: List<Character>): StoryNode {
         val templates = dialogueTemplates[config.theme] ?: dialogueTemplates[StoryTheme.FANTASY]!!
         val template = templates[random.nextInt(templates.size)]
         
         var speaker = template.first
-        if (speaker != "旁白" && nameProvider != null) {
-            // 50%概率替换为随机名字
+        
+        // 50% chance to use one of the generated characters as speaker
+        if (generatedCharacters.isNotEmpty() && random.nextBoolean()) {
+            val char = generatedCharacters.random(random)
+            speaker = char.name
+            // 偶尔加上称号??? No, character name is enough.
+        } else if (speaker != "旁白" && nameProvider != null) {
+             // 50%概率替换为随机名字 (Fallback if not using generated character)
+             // ... existing logic ...
             if (random.nextBoolean()) {
-                speaker = when(config.theme) {
-                    StoryTheme.FANTASY, StoryTheme.MYSTERY, StoryTheme.ROMANCE -> nameProvider.getChineseName()
-                    else -> nameProvider.getEnglishName()
+                val useChinese = when (config.namingStyle) {
+                    NamingStyle.CHINESE -> true
+                    NamingStyle.WESTERN -> false
+                    NamingStyle.AUTO -> when(config.theme) {
+                        StoryTheme.FANTASY, StoryTheme.MYSTERY, StoryTheme.ROMANCE -> true
+                        else -> false
+                    }
                 }
-                // 偶尔加上称号
-                if (random.nextBoolean()) {
-                    speaker += " (${template.first})"
+                
+                speaker = if (useChinese) {
+                    nameProvider.getChineseName()
+                } else {
+                    nameProvider.getEnglishName()
                 }
             }
         }
@@ -417,55 +786,39 @@ class RandomStoryGenerator(
         )
     }
     
-    private suspend fun createBattleNode(id: String, x: Float, y: Float, generatedEnemies: MutableList<Enemy>): StoryNode {
-        // 根据难度计算基础属性
-        val baseHp = 50 + (50 * config.difficulty).toInt()
-        val baseAtk = 5 + (5 * config.difficulty).toInt()
+    private suspend fun createBattleNode(id: String, x: Float, y: Float, enemies: MutableList<Enemy>, availableEnemies: List<Enemy>): StoryNode {
+        // Reuse or clone a generated enemy
+        // If we have available enemies, pick one.
+        // To make it interesting, we can clone it and slighty stat mod it, OR just pick it (if unique enemies aren't required to be unique instances)
+        // Generally RPG enemies can be instantiated multiple times.
+        // But our Enemy model has an ID.
+        // If we reuse the SAME ID, it might be same state?
+        // Let's create a NEW enemy based on one of the available ones (as a template).
         
-        // 敌人模板列表
-        val enemyTemplates = listOf(
-            Triple("slime", "史莱姆", Triple(0.5, 0.5, 0)),
-            Triple("goblin", "哥布林", Triple(0.8, 1.0, 2)),
-            Triple("wolf", "野狼", Triple(1.0, 1.2, 3)),
-            Triple("bandit", "强盗", Triple(1.5, 1.1, 5)),
-            Triple("skeleton", "骷髅兵", Triple(1.2, 1.3, 8)),
-            Triple("dark_knight", "黑暗骑士", Triple(2.5, 1.8, 15)),
-            Triple("dragon", "幼龙", Triple(3.0, 2.5, 20))
+        val templateEnemy = if (availableEnemies.isNotEmpty()) {
+            availableEnemies.random(random)
+        } else {
+            // Fallback Create on the fly
+             val fallbackName = if (nameProvider != null) nameProvider.generate("monster_beast") else "未知怪物"
+             Enemy(id="temp", name=fallbackName, description="", stats=CharacterStats(), expReward=10, goldReward=5)
+        }
+        
+        // Clone and modify
+        val newEnemyId = "${templateEnemy.id}_$id" // unique ID for this instance
+        val newEnemy = templateEnemy.copy(
+             id = newEnemyId,
+             stats = templateEnemy.stats.copy(
+                 currentHp = templateEnemy.stats.maxHp // reset HP
+             )
         )
-        
-        // 根据难度选择可用敌人范围
-        val maxEnemyIndex = (enemyTemplates.size * config.difficulty).toInt().coerceIn(0, enemyTemplates.size - 1)
-        val availableEnemies = enemyTemplates.take(maxOf(1, maxEnemyIndex + 1))
-        val template = availableEnemies[random.nextInt(availableEnemies.size)]
-        
-        val (templateId, baseName, statsMods) = template
-        val (hpMod, atkMod, defVal) = statsMods
-        
-        
-        val enemyName = nameProvider?.generate("monster_beast") ?: baseName
-        
-        val enemy = Enemy(
-            id = "${templateId}_${id}",
-            name = enemyName,
-            description = "一个危险的敌人",
-            stats = CharacterStats(
-                maxHp = (baseHp * hpMod).toInt(),
-                currentHp = (baseHp * hpMod).toInt(),
-                attack = (baseAtk * atkMod).toInt(),
-                defense = defVal,
-                speed = 5 + random.nextInt(10)
-            ),
-            expReward = (10 * (1 + hpMod)).toInt(),
-            goldReward = (5 * (1 + hpMod)).toInt()
-        )
-        
-        generatedEnemies.add(enemy)
+        // Add to the global enemies list for persistence
+        enemies.add(newEnemy)
         
         return StoryNode(
             id = id,
             type = NodeType.BATTLE,
             content = NodeContent.Battle(
-                enemyId = enemy.id,
+                enemyId = newEnemy.id,
                 winNextNodeId = "",
                 loseNextNodeId = ""
             ),
@@ -473,18 +826,22 @@ class RandomStoryGenerator(
         )
     }
     
-    private fun createConditionNode(id: String, x: Float, y: Float): StoryNode {
+    private fun createConditionNode(id: String, x: Float, y: Float, generatedVariables: Map<String, String>): StoryNode {
         // 根据难度调整数值
         val goldBase = (100 * config.difficulty).toInt() + 10
         val levelBase = (10 * config.difficulty).toInt() + 1
         
-        val conditions = listOf(
+        val conditions = mutableListOf(
             "player_level > $levelBase",
-            "has_item:key_gold",
-            "flag:boss_defeated",
-            "gold >= $goldBase",
-            "reputation:kingdom > ${if (config.difficulty > 0.5) 10 else 0}"
+            "gold >= $goldBase"
         )
+        
+        // Add conditions based on generated variables
+        if (generatedVariables.isNotEmpty()) {
+             val randomVar = generatedVariables.keys.random(random)
+             conditions.add("$randomVar > 0")
+        }
+        
         return StoryNode(
             id = id,
             type = NodeType.CONDITION,
@@ -497,7 +854,7 @@ class RandomStoryGenerator(
         )
     }
     
-    private suspend fun createItemNode(id: String, x: Float, y: Float, customItems: MutableList<ItemInstance>): StoryNode {
+    private suspend fun createItemNode(id: String, x: Float, y: Float, customItems: MutableList<ItemInstance>, generatedItems: List<Item>): StoryNode {
         // 30% 概率获得随机生成的装备 (且必须有 nameProvider)
         if (nameProvider != null && random.nextFloat() < 0.3f) {
             val equipmentInstance = createRandomEquipment(id)
@@ -517,7 +874,14 @@ class RandomStoryGenerator(
             )
         }
     
-        val items = listOf("potion_hp", "key_gold", "sword_iron", "scroll_magic")
+        // Use generated items list instead of hardcoded
+        val item = if (generatedItems.isNotEmpty()) {
+             generatedItems.random(random)
+        } else {
+             // Fallback
+             Item(id="potion_test", name="治疗药水", description="", type=ItemType.CONSUMABLE)
+        }
+        
         val actions = ItemActionType.entries
         // 难度越高，获得的数量可能越少
         val maxQty = maxOf(1, 5 - (config.difficulty * 4).toInt())
@@ -526,7 +890,8 @@ class RandomStoryGenerator(
             id = id,
             type = NodeType.ITEM,
             content = NodeContent.ItemAction(
-                itemId = items[random.nextInt(items.size)],
+                itemId = item.id,
+                itemName = item.name, // Pass name for UI display
                 quantity = random.nextInt(1, maxQty + 1),
                 action = actions[random.nextInt(actions.size)],
                 nextNodeId = ""
@@ -582,18 +947,24 @@ class RandomStoryGenerator(
         )
     }
     
-    private fun createVariableNode(id: String, x: Float, y: Float): StoryNode {
-        val variables = listOf("score", "reputation", "gold", "exp")
+    private fun createVariableNode(id: String, x: Float, y: Float, generatedVariables: Map<String, String>): StoryNode {
         val operations = listOf(VariableOperation.ADD, VariableOperation.SET)
         // 难度越高，获得的奖励数值越低
         val baseValue = 100 - (config.difficulty * 80).toInt()
         val value = random.nextInt(1, maxOf(10, baseValue)).toString()
         
+        // Pick from generated variables
+        val variableName = if (generatedVariables.isNotEmpty()) {
+             generatedVariables.keys.random(random)
+        } else {
+             "score"
+        }
+        
         return StoryNode(
             id = id,
             type = NodeType.VARIABLE,
             content = NodeContent.VariableAction(
-                variableName = variables[random.nextInt(variables.size)],
+                variableName = variableName,
                 operation = operations[random.nextInt(operations.size)],
                 value = value,
                 nextNodeId = ""
