@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.novelsim.app.data.model.Location
 import com.novelsim.app.presentation.editor.EditorScreenModel
 import com.novelsim.app.util.PlatformUtils
+import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 
 @Composable
 fun LocationEditor(screenModel: EditorScreenModel) {
@@ -210,6 +211,14 @@ fun LocationDetailEditor(
                  Text("将在后续版本实现 NPC 分配", style = MaterialTheme.typography.bodySmall)
             }
         }
+        
+        // 自定义属性
+        EntityVariableEditor(
+            variables = location.variables,
+            onVariablesChange = { newVars ->
+                onSave(location.copy(variables = newVars))
+            }
+        )
     }
 
     if (showDeleteConfirm) {

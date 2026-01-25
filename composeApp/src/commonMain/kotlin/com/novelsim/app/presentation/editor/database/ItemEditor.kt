@@ -22,6 +22,7 @@ import com.novelsim.app.presentation.editor.EditorScreenModel
 import androidx.compose.material3.HorizontalDivider
 import com.novelsim.app.presentation.editor.components.StatInput
 import com.novelsim.app.util.PlatformUtils
+import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 
 /**
  * 道具编辑器
@@ -244,6 +245,14 @@ fun ItemDetailEditor(
                 }
             }
         }
+        
+        // 自定义属性
+        EntityVariableEditor(
+            variables = item.variables,
+            onVariablesChange = { newVars ->
+                onSave(item.copy(variables = newVars))
+            }
+        )
     }
     
     if (showDeleteConfirm) {
