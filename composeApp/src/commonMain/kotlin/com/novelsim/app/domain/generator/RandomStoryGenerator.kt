@@ -263,6 +263,7 @@ class RandomStoryGenerator(
         val nodes = mutableMapOf<String, StoryNode>()
         val nodeIds = mutableListOf<String>()
         val customItems = mutableListOf<ItemInstance>()
+        val enemies = mutableListOf<Enemy>()
         
         // 1. 创建开始节点
         val startNode = createDialogueNode("start", 100f, 100f)
@@ -288,7 +289,7 @@ class RandomStoryGenerator(
             }
             
             val node = when (nodeType) {
-                NodeType.BATTLE -> createBattleNode(nodeId, currentX, currentY)
+                NodeType.BATTLE -> createBattleNode(nodeId, currentX, currentY, enemies)
                 NodeType.CONDITION -> createConditionNode(nodeId, currentX, currentY)
                 NodeType.ITEM -> createItemNode(nodeId, currentX, currentY, customItems)
                 NodeType.VARIABLE -> createVariableNode(nodeId, currentX, currentY)
@@ -334,7 +335,8 @@ class RandomStoryGenerator(
             nodes = nodes,
             createdAt = PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis(),
-            customItems = customItems
+            customItems = customItems,
+            enemies = enemies
         )
     }
 
@@ -410,7 +412,7 @@ class RandomStoryGenerator(
         )
     }
     
-    private suspend fun createBattleNode(id: String, x: Float, y: Float): StoryNode {
+    private suspend fun createBattleNode(id: String, x: Float, y: Float, generatedEnemies: MutableList<Enemy>): StoryNode {
         // 根据难度计算基础属性
         val baseHp = 50 + (50 * config.difficulty).toInt()
         val baseAtk = 5 + (5 * config.difficulty).toInt()
@@ -431,14 +433,14 @@ class RandomStoryGenerator(
         val availableEnemies = enemyTemplates.take(maxOf(1, maxEnemyIndex + 1))
         val template = availableEnemies[random.nextInt(availableEnemies.size)]
         
-        val (enemyId, baseName, statsMods) = template
+        val (templateId, baseName, statsMods) = template
         val (hpMod, atkMod, defVal) = statsMods
         
         
         val enemyName = nameProvider?.generate("monster_beast") ?: baseName
         
         val enemy = Enemy(
-            id = "${enemyId}_${id}",
+            id = "${templateId}_${id}",
             name = enemyName,
             description = "一个危险的敌人",
             stats = CharacterStats(
@@ -452,11 +454,13 @@ class RandomStoryGenerator(
             goldReward = (5 * (1 + hpMod)).toInt()
         )
         
+        generatedEnemies.add(enemy)
+        
         return StoryNode(
             id = id,
             type = NodeType.BATTLE,
             content = NodeContent.Battle(
-                enemy = enemy,
+                enemyId = enemy.id,
                 winNextNodeId = "",
                 loseNextNodeId = ""
             ),

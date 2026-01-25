@@ -40,25 +40,6 @@ fun FactionEditor(screenModel: EditorScreenModel) {
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Button(
-                    onClick = {
-                        val newFaction = Faction(
-                            id = "fac_${PlatformUtils.getCurrentTimeMillis()}",
-                            name = "新阵营",
-                            description = "",
-                            reputation = 0
-                        )
-                        screenModel.saveFaction(newFaction)
-                        selectedFactionId = newFaction.id
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Text("添加阵营")
-                }
-
-                HorizontalDivider()
-
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.factions) { faction ->
                         ListItem(
@@ -79,6 +60,27 @@ fun FactionEditor(screenModel: EditorScreenModel) {
                                 }
                         )
                         HorizontalDivider()
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FilledTonalButton(
+                            onClick = {
+                                val newFaction = Faction(
+                                    id = "fac_${PlatformUtils.getCurrentTimeMillis()}",
+                                    name = "新阵营",
+                                    description = "",
+                                    reputation = 0
+                                )
+                                screenModel.saveFaction(newFaction)
+                                selectedFactionId = newFaction.id
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(8.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("添加阵营")
+                        }
                     }
                 }
             }
@@ -191,7 +193,7 @@ fun FactionDetailEditor(
                         }
                     },
                     label = { Text("初始声望") },
-                    modifier = Modifier.width(150.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
             }

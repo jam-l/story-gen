@@ -41,24 +41,6 @@ fun LocationEditor(screenModel: EditorScreenModel) {
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Button(
-                    onClick = {
-                        val newLocation = Location(
-                            id = "loc_${PlatformUtils.getCurrentTimeMillis()}",
-                            name = "新地点",
-                            description = ""
-                        )
-                        screenModel.saveLocation(newLocation)
-                        selectedLocationId = newLocation.id
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Text("添加地点")
-                }
-
-                HorizontalDivider()
-
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.locations) { location ->
                         ListItem(
@@ -79,6 +61,26 @@ fun LocationEditor(screenModel: EditorScreenModel) {
                                 }
                         )
                         HorizontalDivider()
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FilledTonalButton(
+                            onClick = {
+                                val newLocation = Location(
+                                    id = "loc_${PlatformUtils.getCurrentTimeMillis()}",
+                                    name = "新地点",
+                                    description = ""
+                                )
+                                screenModel.saveLocation(newLocation)
+                                selectedLocationId = newLocation.id
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(8.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("添加地点")
+                        }
                     }
                 }
             }

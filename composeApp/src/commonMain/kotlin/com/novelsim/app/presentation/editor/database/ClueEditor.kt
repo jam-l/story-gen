@@ -40,24 +40,6 @@ fun ClueEditor(screenModel: EditorScreenModel) {
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Button(
-                    onClick = {
-                        val newClue = Clue(
-                            id = "clue_${PlatformUtils.getCurrentTimeMillis()}",
-                            name = "新线索",
-                            description = ""
-                        )
-                        screenModel.saveClue(newClue)
-                        selectedClueId = newClue.id
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Text("添加线索")
-                }
-
-                HorizontalDivider()
-
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.clues) { clue ->
                         ListItem(
@@ -79,6 +61,26 @@ fun ClueEditor(screenModel: EditorScreenModel) {
                                 }
                         )
                         HorizontalDivider()
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FilledTonalButton(
+                            onClick = {
+                                val newClue = Clue(
+                                    id = "clue_${PlatformUtils.getCurrentTimeMillis()}",
+                                    name = "新线索",
+                                    description = ""
+                                )
+                                screenModel.saveClue(newClue)
+                                selectedClueId = newClue.id
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(8.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("添加线索")
+                        }
                     }
                 }
             }

@@ -27,6 +27,7 @@ import com.novelsim.app.presentation.editor.EditorScreenModel.EditorNode
 @Composable
 fun NodeListEditor(
     nodes: List<EditorNode>,
+    enemies: List<com.novelsim.app.data.model.Enemy> = emptyList(),
     onSelectNode: (String) -> Unit,
     onDeleteNode: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -41,6 +42,7 @@ fun NodeListEditor(
         items(nodes, key = { it.node.id }) { editorNode ->
             NodeListItem(
                 node = editorNode,
+                enemies = enemies,
                 onClick = { onSelectNode(editorNode.node.id) },
                 onDelete = { onDeleteNode(editorNode.node.id) }
             )
@@ -51,6 +53,7 @@ fun NodeListEditor(
 @Composable
 private fun NodeListItem(
     node: EditorNode,
+    enemies: List<com.novelsim.app.data.model.Enemy>,
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -99,7 +102,7 @@ private fun NodeListItem(
                 )
                 
                 Text(
-                    text = getNodeSummary(storyNode.content),
+                    text = getNodeSummary(storyNode.content, enemies),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -121,12 +124,12 @@ private fun NodeListItem(
     }
 }
 
-private fun getNodeSummary(content: NodeContent): String {
+private fun getNodeSummary(content: NodeContent, enemies: List<com.novelsim.app.data.model.Enemy>): String {
     return when (content) {
         is NodeContent.Dialogue -> "${content.speaker ?: "旁白"}: ${content.text}"
         is NodeContent.Choice -> "选择: ${content.prompt}"
         is NodeContent.Ending -> "结局: ${content.title}"
-        is NodeContent.Battle -> "战斗: ${content.enemy.name}"
+        is NodeContent.Battle -> "战斗: ${enemies.find { it.id == content.enemyId }?.name ?: content.enemyId}"
         is NodeContent.Condition -> "条件: ${content.expression}"
         is NodeContent.ItemAction -> "物品: ${content.action} ${content.itemId}"
         is NodeContent.VariableAction -> "变量: ${content.variableName} ${content.operation} ${content.value}"

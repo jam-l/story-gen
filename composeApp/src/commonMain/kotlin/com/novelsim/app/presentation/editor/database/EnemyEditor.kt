@@ -15,25 +15,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.novelsim.app.data.model.*
-import com.novelsim.app.presentation.editor.components.ConditionExpressionEditor
+import com.novelsim.app.data.model.CharacterStats
+import com.novelsim.app.data.model.Enemy
 import com.novelsim.app.presentation.editor.EditorScreenModel
 import com.novelsim.app.util.PlatformUtils
 
-
 @Composable
-fun EventEditor(screenModel: EditorScreenModel) {
+fun EnemyEditor(screenModel: EditorScreenModel) {
     val uiState by screenModel.uiState.collectAsState()
-    var selectedEventId by remember { mutableStateOf<String?>(null) }
+    var selectedEnemyId by remember { mutableStateOf<String?>(null) }
     
-    LaunchedEffect(uiState.events) {
-        if (selectedEventId != null && uiState.events.none { it.id == selectedEventId }) {
-            selectedEventId = null
+    LaunchedEffect(uiState.enemies) {
+        if (selectedEnemyId != null && uiState.enemies.none { it.id == selectedEnemyId }) {
+            selectedEnemyId = null
         }
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
-        // 左侧：事件列表
+        // 左侧：怪物列表
         Card(
             modifier = Modifier
                 .weight(0.3f)
@@ -43,45 +42,45 @@ fun EventEditor(screenModel: EditorScreenModel) {
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(uiState.events) { event ->
+                    items(uiState.enemies) { enemy ->
                         ListItem(
-                            headlineContent = { Text(event.name) },
+                            headlineContent = { Text(enemy.name) },
                             supportingContent = { 
                                 Text(
-                                    text = "条件: ${event.triggerCondition ?: "无"}", 
+                                    text = "HP: ${enemy.stats.maxHp} ATK: ${enemy.stats.attack}", 
                                     maxLines = 1, 
                                     style = MaterialTheme.typography.bodySmall
                                 ) 
                             },
                             modifier = Modifier
-                                .clickable { selectedEventId = event.id }
+                                .clickable { selectedEnemyId = enemy.id }
                                 .let {
-                                    if (selectedEventId == event.id) {
+                                    if (selectedEnemyId == enemy.id) {
                                         it.background(MaterialTheme.colorScheme.primaryContainer)
                                     } else it
                                 }
                         )
                         HorizontalDivider()
                     }
-
+                    
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         FilledTonalButton(
                             onClick = {
-                                val newEvent = GameEvent(
-                                    id = "evt_${PlatformUtils.getCurrentTimeMillis()}",
-                                    name = "新事件",
+                                val newEnemy = Enemy(
+                                    id = "enemy_${PlatformUtils.getCurrentTimeMillis()}",
+                                    name = "新怪物",
                                     description = "",
-                                    startNodeId = "start" // 默认关联开始节点，实际应选择
+                                    stats = CharacterStats(maxHp = 50, currentHp = 50, attack = 5)
                                 )
-                                screenModel.saveEvent(newEvent)
-                                selectedEventId = newEvent.id
+                                screenModel.saveEnemy(newEnemy)
+                                selectedEnemyId = newEnemy.id
                             },
                             modifier = Modifier.fillMaxWidth().padding(8.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("添加事件")
+                            Text("添加怪物")
                         }
                     }
                 }
@@ -95,23 +94,21 @@ fun EventEditor(screenModel: EditorScreenModel) {
                 .fillMaxHeight()
                 .padding(8.dp)
         ) {
-            if (selectedEventId != null) {
-                val event = uiState.events.find { it.id == selectedEventId }
-                if (event != null) {
-                    EventDetailEditor(
-                        event = event,
-                        clues = uiState.clues,
-                        factions = uiState.factions,
-                        onSave = { screenModel.saveEvent(it) },
+            if (selectedEnemyId != null) {
+                val enemy = uiState.enemies.find { it.id == selectedEnemyId }
+                if (enemy != null) {
+                    EnemyDetailEditor(
+                        enemy = enemy,
+                        onSave = { screenModel.saveEnemy(it) },
                         onDelete = { 
-                            screenModel.deleteEvent(it) 
-                            selectedEventId = null
+                            screenModel.deleteEnemy(it) 
+                            selectedEnemyId = null
                         }
                     )
                 }
             } else {
                 Text(
-                    text = "请选择或新建一个事件",
+                    text = "请选择或新建一个怪物",
                     modifier = Modifier.align(Alignment.Center),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -123,19 +120,16 @@ fun EventEditor(screenModel: EditorScreenModel) {
 
 
 @Composable
-fun EventDetailEditor(
-    event: GameEvent,
-    clues: List<Clue> = emptyList(),
-    factions: List<Faction> = emptyList(),
-    onSave: (GameEvent) -> Unit,
+fun EnemyDetailEditor(
+    enemy: Enemy,
+    onSave: (Enemy) -> Unit,
     onDelete: (String) -> Unit
 ) {
-    var name by remember(event) { mutableStateOf(event.name) }
-    var description by remember(event) { mutableStateOf(event.description) }
-    var triggerCondition by remember(event) { mutableStateOf(event.triggerCondition ?: "") }
-    var priority by remember(event) { mutableStateOf(event.priority) }
-    var isRepeatable by remember(event) { mutableStateOf(event.isRepeatable) }
-    var startNodeId by remember(event) { mutableStateOf(event.startNodeId) }
+    var name by remember(enemy) { mutableStateOf(enemy.name) }
+    var description by remember(enemy) { mutableStateOf(enemy.description) }
+    var stats by remember(enemy) { mutableStateOf(enemy.stats) }
+    var expReward by remember(enemy) { mutableStateOf(enemy.expReward) }
+    var goldReward by remember(enemy) { mutableStateOf(enemy.goldReward) }
     
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -153,7 +147,7 @@ fun EventDetailEditor(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "编辑事件",
+                text = "编辑怪物",
                 style = MaterialTheme.typography.headlineSmall
             )
             Button(
@@ -161,7 +155,7 @@ fun EventDetailEditor(
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null)
-                Text("删除事件")
+                Text("删除怪物")
             }
         }
 
@@ -174,9 +168,9 @@ fun EventDetailEditor(
                     value = name,
                     onValueChange = { 
                         name = it
-                        onSave(event.copy(name = it))
+                        onSave(enemy.copy(name = it))
                     },
-                    label = { Text("事件名称") },
+                    label = { Text("名称") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -185,7 +179,7 @@ fun EventDetailEditor(
                     value = description,
                     onValueChange = { 
                         description = it
-                        onSave(event.copy(description = it))
+                        onSave(enemy.copy(description = it))
                     },
                     label = { Text("描述") },
                     modifier = Modifier.fillMaxWidth(),
@@ -194,82 +188,108 @@ fun EventDetailEditor(
             }
         }
         
-        // 触发逻辑
+        // 战斗属性
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("触发逻辑", style = MaterialTheme.typography.titleMedium)
+                Text("战斗属性", style = MaterialTheme.typography.titleMedium)
                 
-                OutlinedTextField(
-                    value = startNodeId ?: "",
-                    onValueChange = { 
-                        startNodeId = it
-                        onSave(event.copy(startNodeId = it.ifEmpty { "start" }))
-                    },
-                    label = { Text("起始节点 ID") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                HorizontalDivider()
-                
-                Text("触发条件", style = MaterialTheme.typography.bodyMedium)
-                
-                ConditionExpressionEditor(
-                    expression = triggerCondition,
-                    clues = clues,
-                    factions = factions,
-                    onExpressionChange = { 
-                        triggerCondition = it
-                        onSave(event.copy(triggerCondition = it.ifEmpty { null }))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatInput(
+                        label = "最大生命 (HP)", 
+                        value = stats.maxHp,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        stats = stats.copy(maxHp = it, currentHp = it) // 默认满血
+                        onSave(enemy.copy(stats = stats))
                     }
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("优先级")
-                     OutlinedTextField(
-                        value = priority.toString(),
-                        onValueChange = { 
-                            if (it.all { c -> c.isDigit() }) {
-                                val p = it.toIntOrNull() ?: 0
-                                priority = p
-                                onSave(event.copy(priority = p))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
+                    StatInput(
+                        label = "最大法力 (MP)", 
+                        value = stats.maxMp,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        stats = stats.copy(maxMp = it, currentMp = it)
+                        onSave(enemy.copy(stats = stats))
+                    }
                 }
                 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = isRepeatable,
-                        onCheckedChange = { 
-                            isRepeatable = it
-                            onSave(event.copy(isRepeatable = it))
-                        }
-                    )
-                    Text("可重复触发")
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatInput(
+                        label = "攻击力", 
+                        value = stats.attack,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        stats = stats.copy(attack = it)
+                        onSave(enemy.copy(stats = stats))
+                    }
+                    StatInput(
+                        label = "防御力", 
+                        value = stats.defense,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        stats = stats.copy(defense = it)
+                        onSave(enemy.copy(stats = stats))
+                    }
+                }
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatInput(
+                        label = "速度", 
+                        value = stats.speed,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        stats = stats.copy(speed = it)
+                        onSave(enemy.copy(stats = stats))
+                    }
+                    StatInput(
+                        label = "幸运", 
+                        value = stats.luck,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        stats = stats.copy(luck = it)
+                        onSave(enemy.copy(stats = stats))
+                    }
                 }
             }
         }
+        
+        // 奖励
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("战利品", style = MaterialTheme.typography.titleMedium)
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatInput(
+                        label = "经验值奖励", 
+                        value = expReward,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        expReward = it
+                        onSave(enemy.copy(expReward = it))
+                    }
+                    StatInput(
+                        label = "金币奖励", 
+                        value = goldReward,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        goldReward = it
+                        onSave(enemy.copy(goldReward = it))
+                    }
+                }
+            }
+        }
+        
+        // TODO: 掉落物
     }
 
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("确认删除") },
-            text = { Text("确定要删除事件 \"${event.name}\" 吗？此操作无法撤销。") },
+            text = { Text("确定要删除怪物 \"${enemy.name}\" 吗？此操作无法撤销。") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDelete(event.id)
+                        onDelete(enemy.id)
                         showDeleteConfirm = false
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)

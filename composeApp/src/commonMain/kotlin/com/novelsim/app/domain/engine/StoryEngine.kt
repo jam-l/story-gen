@@ -19,6 +19,7 @@ class StoryEngine(
     private var currentStory: Story? = null
     private var currentGameState: GameState? = null
     private var events: Map<String, GameEvent> = emptyMap()
+    private var enemies: Map<String, Enemy> = emptyMap()
     
     /**
      * 加载故事并初始化游戏状态
@@ -36,8 +37,9 @@ class StoryEngine(
             itemInstances = story.customItems.associateBy { it.uid }.toMutableMap()
         )
         
-        // 加载并缓存故事事件
+        // 加载并缓存故事事件和怪物
         events = storyRepository.getEvents(storyId).associateBy { it.id }
+        enemies = storyRepository.getEnemies(storyId).associateBy { it.id }
         
         val startNode = story.nodes[story.startNodeId]
             ?: return Result.failure(Exception("起始节点不存在: ${story.startNodeId}"))
@@ -76,6 +78,11 @@ class StoryEngine(
      * 获取当前故事
      */
     fun getCurrentStory(): Story? = currentStory
+
+    /**
+     * 获取敌人信息
+     */
+    fun getEnemy(enemyId: String): Enemy? = enemies[enemyId]
     
     /**
      * 处理选择，执行效果并跳转到下一个节点
@@ -140,7 +147,7 @@ class StoryEngine(
             val contentText = when(val content = nextNode.content) {
                 is NodeContent.Dialogue -> content.text
                 is NodeContent.Ending -> content.description
-                is NodeContent.Battle -> "遭遇敌人: ${content.enemy.name}"
+                is NodeContent.Battle -> "遭遇敌人: ${enemies[content.enemyId]?.name ?: "未知敌人"}"
                 else -> ""
             }
             

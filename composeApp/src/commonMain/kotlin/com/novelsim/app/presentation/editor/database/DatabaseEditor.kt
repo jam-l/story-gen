@@ -27,7 +27,7 @@ fun DatabaseEditor(
     screenModel: EditorScreenModel
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("角色", "地点", "事件", "线索", "阵营")
+    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物")
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -67,6 +67,7 @@ fun DatabaseEditor(
                     2 -> EventEditor(screenModel)
                     3 -> ClueEditor(screenModel)
                     4 -> FactionEditor(screenModel)
+                    5 -> EnemyEditor(screenModel)
                 }
             }
         }
@@ -95,24 +96,6 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Button(
-                    onClick = {
-                        val newChar = Character(
-                            id = "char_${com.novelsim.app.util.PlatformUtils.getCurrentTimeMillis()}",
-                            name = "新角色",
-                            description = ""
-                        )
-                        screenModel.saveCharacter(newChar)
-                        selectedCharacterId = newChar.id
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Text("添加角色")
-                }
-
-                HorizontalDivider()
-
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.characters) { character ->
                         ListItem(
@@ -133,6 +116,26 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
                                 }
                         )
                         HorizontalDivider()
+                    }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FilledTonalButton(
+                            onClick = {
+                                val newChar = Character(
+                                    id = "char_${com.novelsim.app.util.PlatformUtils.getCurrentTimeMillis()}",
+                                    name = "新角色",
+                                    description = ""
+                                )
+                                screenModel.saveCharacter(newChar)
+                                selectedCharacterId = newChar.id
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(8.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("添加角色")
+                        }
                     }
                 }
             }
@@ -241,33 +244,57 @@ fun CharacterDetailEditor(
                 Text("基础属性", style = MaterialTheme.typography.titleMedium)
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StatInput("最大生命 (HP)", stats.maxHp) {
+                    StatInput(
+                        label = "最大生命 (HP)", 
+                        value = stats.maxHp,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         stats = stats.copy(maxHp = it, currentHp = it)
                         onSave(character.copy(baseStats = stats))
                     }
-                    StatInput("最大法力 (MP)", stats.maxMp) {
+                    StatInput(
+                        label = "最大法力 (MP)", 
+                        value = stats.maxMp,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         stats = stats.copy(maxMp = it, currentMp = it)
                         onSave(character.copy(baseStats = stats))
                     }
                 }
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StatInput("攻击力", stats.attack) {
+                    StatInput(
+                        label = "攻击力", 
+                        value = stats.attack,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         stats = stats.copy(attack = it)
                         onSave(character.copy(baseStats = stats))
                     }
-                    StatInput("防御力", stats.defense) {
+                    StatInput(
+                        label = "防御力", 
+                        value = stats.defense,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         stats = stats.copy(defense = it)
                         onSave(character.copy(baseStats = stats))
                     }
                 }
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StatInput("速度", stats.speed) {
+                    StatInput(
+                        label = "速度", 
+                        value = stats.speed,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         stats = stats.copy(speed = it)
                         onSave(character.copy(baseStats = stats))
                     }
-                    StatInput("幸运", stats.luck) {
+                    StatInput(
+                        label = "幸运", 
+                        value = stats.luck,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         stats = stats.copy(luck = it)
                         onSave(character.copy(baseStats = stats))
                     }
@@ -302,7 +329,12 @@ fun CharacterDetailEditor(
 }
 
 @Composable
-fun StatInput(label: String, value: Int, onValueChange: (Int) -> Unit) {
+fun StatInput(
+    label: String, 
+    value: Int, 
+    modifier: Modifier = Modifier,
+    onValueChange: (Int) -> Unit
+) {
     var text by remember(value) { mutableStateOf(value.toString()) }
     
     OutlinedTextField(
@@ -314,7 +346,7 @@ fun StatInput(label: String, value: Int, onValueChange: (Int) -> Unit) {
             }
         },
         label = { Text(label) },
-        modifier = Modifier.width(150.dp),
+        modifier = modifier,
         singleLine = true
     )
 }

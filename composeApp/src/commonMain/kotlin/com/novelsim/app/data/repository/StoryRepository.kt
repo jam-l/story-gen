@@ -29,6 +29,7 @@ class StoryRepository(
     private val eventQueries = database.gameEventQueries
     private val clueQueries = database.clueQueries
     private val factionQueries = database.factionQueries
+    private val enemyQueries = database.enemyQueries
 
     
     private val json = Json { 
@@ -95,29 +96,9 @@ class StoryRepository(
             startNodeId = dbStory.startNodeId,
             nodes = nodesMap,
             variables = variables,
-            enemies = try {
-                // 暂时添加调试信息
-                val loadedEnemies: List<Enemy> = json.decodeFromString(dbStory.enemiesJson)
-                if (loadedEnemies.isEmpty()) {
-                   // 如果也就是空的，可能是生成时就是空的?
-                   // 但 RandomStoryGenerator 不会为空。
-                   emptyList() 
-                } else {
-                   loadedEnemies
-                }
-            } catch (e: Exception) {
-                // 发生异常时，返回一个带有错误信息的假敌人，以便在UI中看到错误原因
-                 listOf(
-                    Enemy(
-                        id = "error_decoding",
-                        name = "数据读取错误",
-                        description = "无法解析敌人数据: ${e.message}",
-                        stats = CharacterStats(),
-                        expReward = 0,
-                        goldReward = 0
-                    )
-                )
-            },
+
+            // 从独立表加载怪物
+            enemies = enemyQueries.getEnemiesForStory(storyId).executeAsList().map { it.toEnemy() },
             createdAt = dbStory.createdAt,
             updatedAt = dbStory.updatedAt
         )
@@ -141,8 +122,8 @@ class StoryRepository(
                 createdAt = story.createdAt,
                 updatedAt = story.updatedAt
             )
-            
-            // 批量保存所有节点 (直接使用 nodeQueries 避免触发 updateStoryMeta)
+
+            // 批量保存所有节点
             story.nodes.forEach { (nodeId, node) ->
                 nodeQueries.insertNode(
                     id = node.id,
@@ -152,6 +133,19 @@ class StoryRepository(
                     positionX = node.position.x.toDouble(),
                     positionY = node.position.y.toDouble(),
                     connectionsJson = json.encodeToString(node.connections)
+                )
+            }
+            
+            // 批量保存所有怪物
+            story.enemies.forEach { enemy ->
+                enemyQueries.insertEnemy(
+                    id = enemy.id,
+                    storyId = story.id,
+                    name = enemy.name,
+                    description = enemy.description,
+                    statsJson = json.encodeToString(enemy.stats),
+                    expReward = enemy.expReward.toLong(),
+                    goldReward = enemy.goldReward.toLong()
                 )
             }
         }
@@ -484,6 +478,53 @@ class StoryRepository(
             reputation = reputation.toInt()
         )
     }
+
+    // ============================================================================================
+    // 怪物管理方法 (SQL Table)
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有怪物
+     */
+    suspend fun getEnemies(storyId: String): List<Enemy> {
+        return enemyQueries.getEnemiesForStory(storyId).executeAsList().map { it.toEnemy() }
+    }
+
+    /**
+     * 保存怪物
+     */
+    suspend fun saveEnemy(enemy: Enemy, storyId: String) {
+        enemyQueries.insertEnemy(
+            id = enemy.id,
+            storyId = storyId,
+            name = enemy.name,
+            description = enemy.description,
+            statsJson = json.encodeToString(enemy.stats),
+            expReward = enemy.expReward.toLong(),
+            goldReward = enemy.goldReward.toLong()
+        )
+    }
+
+    /**
+     * 删除怪物
+     */
+    suspend fun deleteEnemy(enemyId: String, storyId: String) {
+        enemyQueries.deleteEnemy(enemyId, storyId)
+    }
+    
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Enemy.toEnemy(): Enemy {
+        return Enemy(
+            id = id,
+            name = name,
+            description = description,
+            stats = try { json.decodeFromString(statsJson) } catch (e: Exception) { CharacterStats() },
+            expReward = expReward.toInt(),
+            goldReward = goldReward.toInt()
+        )
+    }
     // ============================================================================================
     // 创建示例故事
     // ============================================================================================
@@ -534,23 +575,28 @@ class StoryRepository(
             id = "battle1",
             type = NodeType.BATTLE,
             content = NodeContent.Battle(
-                enemy = Enemy(
-                    id = "goblin",
-                    name = "哥布林",
-                    description = "狡猾的绿皮小怪物",
-                    stats = CharacterStats(
-                        maxHp = 30,
-                        currentHp = 30,
-                        attack = 8,
-                        defense = 3
-                    ),
-                    expReward = 10,
-                    goldReward = 5
-                ),
+                enemyId = "goblin",
                 winNextNodeId = "win_ending",
                 loseNextNodeId = "lose_ending"
             ),
             position = NodePosition(50f, 550f)
+        )
+        
+        // ... (省略其他节点)
+
+        // 示例敌人
+        val sampleEnemy = Enemy(
+            id = "goblin",
+            name = "哥布林",
+            description = "狡猾的绿皮小怪物",
+            stats = CharacterStats(
+                maxHp = 30,
+                currentHp = 30,
+                attack = 8,
+                defense = 3
+            ),
+            expReward = 10,
+            goldReward = 5
         )
         
         // 城镇节点
@@ -624,6 +670,7 @@ class StoryRepository(
             description = "一个简单的冒险故事，展示游戏的基本功能。",
             startNodeId = "start",
             nodes = nodes,
+            enemies = listOf(sampleEnemy),
             createdAt = PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis()
         )

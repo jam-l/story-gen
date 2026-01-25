@@ -236,8 +236,10 @@ class StoryPlayerScreenModel(
         val content = node.content as? NodeContent.Battle ?: return
         val gameState = _uiState.value.gameState ?: return
         
-        // 直接使用嵌入在节点中的敌人数据，无需查找
-        val battleState = battleSystem.startBattle(gameState.playerStats, content.enemy)
+        // 从引擎获取敌人数据
+        val enemy = storyEngine.getEnemy(content.enemyId) ?: return // 如果找不到敌人，可能需要处理错误或显示占位符
+        
+        val battleState = battleSystem.startBattle(gameState.playerStats, enemy)
         
         _uiState.value = _uiState.value.copy(
             displayMode = DisplayMode.BATTLE,

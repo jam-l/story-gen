@@ -53,7 +53,8 @@ class EditorScreenModel(
         val locations: List<Location> = emptyList(), // 地点列表
         val events: List<GameEvent> = emptyList(), // 事件列表
         val clues: List<Clue> = emptyList(), // 线索列表
-        val factions: List<Faction> = emptyList() // 阵营列表
+        val factions: List<Faction> = emptyList(), // 阵营列表
+        val enemies: List<Enemy> = emptyList() // 怪物列表
     )
     
     private val _uiState = MutableStateFlow(UiState())
@@ -94,6 +95,7 @@ class EditorScreenModel(
                 loadEvents()
                 loadClues()
                 loadFactions()
+                loadEnemies()
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -150,14 +152,7 @@ class EditorScreenModel(
                 falseNextNodeId = ""
             )
             NodeType.BATTLE -> NodeContent.Battle(
-                enemy = Enemy(
-                    id = "new_enemy",
-                    name = "新敌人",
-                    description = "请编辑敌人属性",
-                    stats = CharacterStats(maxHp = 50, currentHp = 50, attack = 5, defense = 2),
-                    expReward = 10,
-                    goldReward = 5
-                ),
+                enemyId = _uiState.value.enemies.firstOrNull()?.id ?: "goblin", // 默认选择第一个或哥布林
                 winNextNodeId = "",
                 loseNextNodeId = ""
             )
@@ -344,9 +339,11 @@ class EditorScreenModel(
      * 切换视图模式
      */
     fun toggleViewMode() {
-        _uiState.update { state ->
-            state.copy(isListMode = !state.isListMode)
-        }
+        val newMode = !_uiState.value.isListMode
+        _uiState.update { state -> state.copy(isListMode = newMode) }
+        
+        // 切换模式时自动保存，防止数据丢失
+        saveStory()
     }
 
     /**
@@ -576,6 +573,43 @@ class EditorScreenModel(
             loadFactions()
         }
     }
+    
+    // ============================================================================================
+    // 怪物管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载怪物列表
+     */
+    private fun loadEnemies() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val enemies = storyRepository.getEnemies(storyId)
+            _uiState.update { it.copy(enemies = enemies) }
+        }
+    }
+    
+    /**
+     * 保存怪物
+     */
+    fun saveEnemy(enemy: Enemy) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveEnemy(enemy, storyId)
+            loadEnemies()
+        }
+    }
+    
+    /**
+     * 删除怪物
+     */
+    fun deleteEnemy(enemyId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteEnemy(enemyId, storyId)
+            loadEnemies()
+        }
+    }
 
     /**
      * 导出为 JSON
@@ -601,7 +635,7 @@ class EditorScreenModel(
             locations = _uiState.value.locations,
             events = _uiState.value.events,
             clues = _uiState.value.clues,
-            factions = _uiState.value.factions
+            factions = _uiState.value.factions // StoryExporter 暂时还不支持 enemies，需要更新 Exporter
         )
     }
 }
