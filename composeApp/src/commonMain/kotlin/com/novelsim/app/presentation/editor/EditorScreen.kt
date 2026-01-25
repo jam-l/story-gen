@@ -68,7 +68,7 @@ data class EditorScreen(
                     onSave = { screenModel.saveStory() },
                     onExport = { 
                         val json = screenModel.exportToJson()
-                        println(json)
+                        println("Exported JSON: $json") // Temporary: print to console
                     },
                     onTitleChange = { screenModel.updateStoryTitle(it) },
                     onToggleViewMode = { screenModel.toggleViewMode() },
@@ -153,8 +153,8 @@ data class EditorScreen(
                                     locations = uiState.locations,
                                     events = uiState.events,
                                     enemies = uiState.enemies,
-                                    items = uiState.story?.items ?: emptyList(),
-                                    variables = uiState.story?.variables ?: emptyMap(),
+                                    items = uiState.items,
+                                    variables = uiState.variables.associateWith { "" }, // Only keys are needed for dropdowns
                                     onContentChange = { screenModel.updateNodeContent(node.id, it) },
                                     onDelete = { screenModel.deleteNode(node.id) },
                                     onClose = { screenModel.closeNodeEditor() }

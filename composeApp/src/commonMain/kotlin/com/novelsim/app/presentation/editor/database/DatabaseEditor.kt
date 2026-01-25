@@ -28,7 +28,7 @@ fun DatabaseEditor(
     screenModel: EditorScreenModel
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物", "道具")
+    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物", "道具", "变量")
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -70,6 +70,7 @@ fun DatabaseEditor(
                     4 -> FactionEditor(screenModel)
                     5 -> EnemyEditor(screenModel)
                     6 -> ItemEditor(screenModel)
+                    7 -> VariableListEditor(screenModel)
                 }
             }
         }

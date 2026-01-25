@@ -55,7 +55,8 @@ class EditorScreenModel(
         val clues: List<Clue> = emptyList(), // 线索列表
         val factions: List<Faction> = emptyList(), // 阵营列表
         val enemies: List<Enemy> = emptyList(), // 怪物列表
-        val items: List<Item> = emptyList() // 道具列表
+        val items: List<Item> = emptyList(), // 道具列表
+        val variables: List<String> = emptyList() // 变量列表 (Key only)
     )
     
     private val _uiState = MutableStateFlow(UiState())
@@ -98,6 +99,7 @@ class EditorScreenModel(
                 loadFactions()
                 loadEnemies()
                 loadItems()
+                _uiState.update { it.copy(variables = story.variables.keys.toList()) }
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -667,7 +669,7 @@ class EditorScreenModel(
             description = _uiState.value.storyDescription,
             startNodeId = startNodeId,
             nodes = nodesMap,
-            createdAt = PlatformUtils.getCurrentTimeMillis(),
+            createdAt = _uiState.value.story?.createdAt ?: PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis()
         )
         
@@ -679,5 +681,52 @@ class EditorScreenModel(
             clues = _uiState.value.clues,
             factions = _uiState.value.factions // StoryExporter 暂时还不支持 enemies，需要更新 Exporter
         )
+    }
+
+    // ============================================================================================
+    // 变量管理逻辑
+    // ============================================================================================
+
+    /**
+     * 保存变量
+     */
+    fun saveVariable(name: String, initialValue: String) {
+        val currentStory = _uiState.value.story ?: return
+        val currentVariables = currentStory.variables.toMutableMap()
+        currentVariables[name] = initialValue
+        
+        val updatedStory = currentStory.copy(variables = currentVariables)
+        
+        // 立即保存到数据库并更新 UI
+        screenModelScope.launch {
+             storyRepository.saveStory(updatedStory)
+             _uiState.update { 
+                 it.copy(
+                     story = updatedStory, 
+                     variables = updatedStory.variables.keys.toList() 
+                 ) 
+             }
+        }
+    }
+
+    /**
+     * 删除变量
+     */
+    fun deleteVariable(name: String) {
+        val currentStory = _uiState.value.story ?: return
+        val currentVariables = currentStory.variables.toMutableMap()
+        if (currentVariables.remove(name) != null) {
+            val updatedStory = currentStory.copy(variables = currentVariables)
+            
+            screenModelScope.launch {
+                storyRepository.saveStory(updatedStory)
+                _uiState.update { 
+                    it.copy(
+                        story = updatedStory, 
+                        variables = updatedStory.variables.keys.toList() 
+                    ) 
+                }
+            }
+        }
     }
 }
