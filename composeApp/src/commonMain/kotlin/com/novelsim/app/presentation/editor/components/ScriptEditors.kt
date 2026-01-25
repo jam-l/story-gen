@@ -31,14 +31,15 @@ fun VariableEditor(
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = content.variableName,
-                onValueChange = { onContentChange(content.copy(variableName = it)) },
+                onValueChange = { /* 禁止编辑 */ },
                 label = { Text("变量名") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("例如: player_score") },
+                readOnly = true, // 禁止手动编辑
+                placeholder = { Text("请在下拉菜单中选择") },
                 trailingIcon = {
                     IconButton(onClick = { expandedVar = true }) {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "选择变量")
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "从现有变量选择")
                     }
                 }
             )
@@ -397,14 +398,16 @@ fun ItemActionEditor(
         } else {
             var expandedItem by remember { mutableStateOf(false) }
             Box(modifier = Modifier.fillMaxWidth()) {
+                val selectedItem = items.find { it.id == content.itemId }
                 OutlinedTextField(
-                    value = content.itemId,
-                    onValueChange = { onContentChange(content.copy(itemId = it)) },
-                    label = { Text("道具 ID") },
+                    value = selectedItem?.let { "${it.name} (${it.id})" } ?: content.itemId,
+                    onValueChange = { /* 只能通过选择修改 */ },
+                    label = { Text("执行道具") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     readOnly = true, // 只能选择
                     placeholder = { Text("例如: potion_hp") },
+                    supportingText = { Text(if (content.itemId.isEmpty()) "请在下方菜单选择道具" else "ID: ${content.itemId}") },
                     trailingIcon = {
                         IconButton(onClick = { expandedItem = true }) {
                             Icon(Icons.Default.ArrowDropDown, contentDescription = "选择道具")
@@ -436,7 +439,10 @@ fun ItemActionEditor(
                                 }
                             },
                             onClick = {
-                                onContentChange(content.copy(itemId = item.id))
+                                onContentChange(content.copy(
+                                    itemId = item.id,
+                                    itemName = item.name
+                                ))
                                 expandedItem = false
                             }
                         )

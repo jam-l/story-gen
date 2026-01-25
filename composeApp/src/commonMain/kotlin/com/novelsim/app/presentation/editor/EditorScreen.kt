@@ -774,6 +774,7 @@ private fun NodeEditorPanel(
                         is NodeContent.Choice -> {
                             ChoiceEditor(
                                 content = content,
+                                availableNodes = allNodes.map { it.node },
                                 clues = clues,
                                 factions = factions,
                                 characters = characters,
@@ -880,6 +881,7 @@ private fun DialogueEditor(
                 label = { Text("说话者") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = true, // 禁止手动编辑
                 trailingIcon = {
                     IconButton(onClick = { expanded = true }) {
                         Icon(Icons.Default.ArrowDropDown, contentDescription = "选择角色")
@@ -923,9 +925,10 @@ private fun DialogueEditor(
                 onContentChange(content.copy(text = it))
             },
             label = { Text("对话内容") },
+            placeholder = { Text("在此输入对话或旁白描述...") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
-            maxLines = 6
+            maxLines = 10
         )
     }
 }
@@ -933,6 +936,7 @@ private fun DialogueEditor(
 @Composable
 private fun ChoiceEditor(
     content: NodeContent.Choice,
+    availableNodes: List<StoryNode>,
     clues: List<Clue>,
     factions: List<Faction>,
     characters: List<Character>,
@@ -970,17 +974,47 @@ private fun ChoiceEditor(
                 Column(modifier = Modifier.padding(12.dp)) {
                     var optionText by remember(option) { mutableStateOf(option.text) }
                     
-                    OutlinedTextField(
-                        value = optionText,
-                        onValueChange = { newText ->
-                            optionText = newText
-                            val newOptions = content.options.toMutableList()
-                            newOptions[index] = option.copy(text = newText)
-                            onContentChange(content.copy(options = newOptions))
-                        },
-                        label = { Text("选项 ${index + 1}") },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = optionText,
+                            onValueChange = { newText ->
+                                optionText = newText
+                                val newOptions = content.options.toMutableList()
+                                newOptions[index] = option.copy(text = newText)
+                                onContentChange(content.copy(options = newOptions))
+                            },
+                            label = { Text("选项 ${index + 1}") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        
+                        IconButton(
+                            onClick = {
+                                val newOptions = content.options.toMutableList()
+                                newOptions.removeAt(index)
+                                onContentChange(content.copy(options = newOptions))
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "删除选项", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 下一节点选择 (核心修复)
+                    NodeSelector(
+                        label = "点击后跳转到",
+                        selectedNodeId = option.nextNodeId,
+                        availableNodes = availableNodes,
+                        onNodeSelect = { nodeId ->
+                            val newOptions = content.options.toMutableList()
+                            newOptions[index] = option.copy(nextNodeId = nodeId)
+                            onContentChange(content.copy(options = newOptions))
+                        }
                     )
                     
                     if (optionText.isNotEmpty()) {

@@ -125,22 +125,32 @@ fun ConditionExpressionEditor(
         
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ConditionTypeChip("变量", expressionType == ExpressionType.VARIABLE) { 
-                expressionType = ExpressionType.VARIABLE; update() 
+                expressionType = ExpressionType.VARIABLE
+                if (variables.isNotEmpty()) { variableName = variables.first() }
+                update() 
             }
             ConditionTypeChip("道具", expressionType == ExpressionType.ITEM) { 
-                expressionType = ExpressionType.ITEM; update() 
+                expressionType = ExpressionType.ITEM
+                if (items.isNotEmpty()) { variableName = items.first().id }
+                update() 
             }
             ConditionTypeChip("标记", expressionType == ExpressionType.FLAG) { 
-                expressionType = ExpressionType.FLAG; update() 
+                expressionType = ExpressionType.FLAG
+                // For flags, we don't have a list to select from, keep current or empty
+                update() 
             }
         }
         
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
              ConditionTypeChip("线索", expressionType == ExpressionType.CLUE) { 
-                expressionType = ExpressionType.CLUE; update() 
+                expressionType = ExpressionType.CLUE
+                if (clues.isNotEmpty()) { variableName = clues.first().id }
+                update() 
             }
             ConditionTypeChip("阵营", expressionType == ExpressionType.FACTION) { 
-                expressionType = ExpressionType.FACTION; update() 
+                expressionType = ExpressionType.FACTION
+                if (factions.isNotEmpty()) { variableName = factions.first().id }
+                update() 
             }
         }
         
@@ -240,15 +250,15 @@ private fun VariableConditionEditor(
             Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = variableName,
-                    onValueChange = onVariableChange,
+                    onValueChange = {}, // 禁止手动输入内容
                     label = { Text("变量名") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    readOnly = true, // 只能选择
-                    placeholder = { Text("例如: player_level") },
+                    readOnly = true, // 禁止手动编辑
+                    placeholder = { Text("请点击右侧图标选择") },
                     trailingIcon = {
                         IconButton(onClick = { expanded = true }) {
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = "选择变量")
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "选择现有变量")
                         }
                     },
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -359,14 +369,16 @@ private fun ItemConditionEditor(
             }
         } else {
             Box(modifier = Modifier.fillMaxWidth()) {
+                val selectedItem = items.find { it.id == itemId }
                 OutlinedTextField(
-                    value = itemId,
+                    value = selectedItem?.let { "${it.name} (${it.id})" } ?: itemId,
                     onValueChange = onItemChange,
-                    label = { Text("道具 ID") },
+                    label = { Text("道具") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     readOnly = true, // 只能选择
                     placeholder = { Text("例如: key_gold") },
+                    supportingText = { Text(if (itemId.isEmpty()) "请在菜单中选择" else "ID: $itemId") },
                     trailingIcon = {
                         IconButton(onClick = { expanded = true }) {
                             Icon(Icons.Default.ArrowDropDown, contentDescription = "选择道具")
@@ -509,13 +521,15 @@ private fun ClueConditionEditor(
         }
     } else {
         Box(modifier = Modifier.fillMaxWidth()) {
+            val selectedClue = clues.find { it.id == clueId }
             OutlinedTextField(
-                value = clueId,
+                value = selectedClue?.let { "${it.name} (${it.id})" } ?: clueId,
                 onValueChange = onClueChange,
-                label = { Text("线索 ID") },
+                label = { Text("线索") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 readOnly = true, // 只能选择
+                supportingText = { Text(if (clueId.isEmpty()) "请选择线索" else "ID: $clueId") },
                 trailingIcon = {
                      IconButton(onClick = { expanded = true }) {
                         Icon(Icons.Default.ArrowDropDown, contentDescription = "选择线索")
@@ -588,13 +602,15 @@ private fun FactionConditionEditor(
             }
         } else {
              Box(modifier = Modifier.fillMaxWidth()) {
+                val selectedFaction = factions.find { it.id == factionId }
                 OutlinedTextField(
-                    value = factionId,
+                    value = selectedFaction?.let { "${it.name} (${it.id})" } ?: factionId,
                     onValueChange = onFactionChange,
-                    label = { Text("阵营 ID") },
+                    label = { Text("阵营") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     readOnly = true, // 只能选择
+                    supportingText = { Text(if (factionId.isEmpty()) "请选择阵营" else "ID: $factionId") },
                     trailingIcon = {
                          IconButton(onClick = { expanded = true }) {
                             Icon(Icons.Default.ArrowDropDown, contentDescription = "选择阵营")
