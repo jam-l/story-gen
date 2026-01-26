@@ -804,6 +804,9 @@ private fun NodeEditorPanel(
                                 content = content,
                                 availableNodes = allNodes.map { it.node },
                                 availableVariables = variables.keys.toList(),
+                                characters = characters,
+                                locations = locations,
+                                items = items,
                                 onContentChange = onContentChange
                             )
                         }

@@ -140,6 +140,31 @@ class StoryPlayerScreenModel(
                     isTyping = false
                 )
             }
+            NodeType.VARIABLE -> {
+                val content = node.content as? NodeContent.VariableAction
+                if (content != null) {
+                    // 执行变量操作
+                    storyEngine.executeVariableAction(content)
+                    
+                    // 跳转到下一个节点
+                    if (content.nextNodeId.isNotEmpty()) {
+                        storyEngine.navigateToNode(content.nextNodeId).fold(
+                            onSuccess = { nextNode ->
+                                _uiState.value = _uiState.value.copy(
+                                    currentNode = nextNode,
+                                    gameState = storyEngine.getGameState()
+                                )
+                                processNode(nextNode)
+                            },
+                            onFailure = {
+                                _uiState.value = _uiState.value.copy(error = it.message)
+                            }
+                        )
+                    } else {
+                        continueToNextNode()
+                    }
+                }
+            }
             else -> {
                 // 自动跳转到下一个节点
                 continueToNextNode()

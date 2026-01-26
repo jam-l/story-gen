@@ -20,50 +20,196 @@ fun VariableEditor(
     content: NodeContent.VariableAction,
     availableNodes: List<StoryNode>,
     availableVariables: List<String> = emptyList(),
+    items: List<Item> = emptyList(),
+    characters: List<Character> = emptyList(),
+    locations: List<Location> = emptyList(),
     onContentChange: (NodeContent) -> Unit
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 变量名
-        // 变量名
-        var expandedVar by remember { mutableStateOf(false) }
-        Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = content.variableName,
-                onValueChange = { /* 禁止编辑 */ },
-                label = { Text("变量名") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                readOnly = true, // 禁止手动编辑
-                placeholder = { Text("请在下拉菜单中选择") },
-                trailingIcon = {
-                    IconButton(onClick = { expandedVar = true }) {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "从现有变量选择")
+        // 变量类型选择
+        var isEntityVariable by remember(content.variableName) { 
+            mutableStateOf(content.variableName.startsWith("@")) 
+        }
+        
+        Text("变量类型", style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = !isEntityVariable,
+                onClick = { 
+                    isEntityVariable = false
+                    if (availableVariables.isNotEmpty()) {
+                        onContentChange(content.copy(variableName = availableVariables.first()))
+                    } else {
+                        onContentChange(content.copy(variableName = ""))
+                    }
+                },
+                label = { Text("全局变量") }
+            )
+            FilterChip(
+                selected = isEntityVariable,
+                onClick = { 
+                    isEntityVariable = true
+                    // Initialize with default if switching to entity (e.g. first char)
+                    val defaultName = if (characters.isNotEmpty()) "@char:${characters.first().id}:" else "@char::"
+                    onContentChange(content.copy(variableName = defaultName))
+                },
+                label = { Text("实体变量") }
+            )
+        }
+
+        if (!isEntityVariable) {
+            // 原有的变量名选择逻辑
+            var expandedVar by remember { mutableStateOf(false) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = content.variableName,
+                    onValueChange = { /* 禁止编辑 */ },
+                    label = { Text("变量名") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = true, // 禁止手动编辑
+                    placeholder = { Text("请在下拉菜单中选择") },
+                    trailingIcon = {
+                        IconButton(onClick = { expandedVar = true }) {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "从现有变量选择")
+                        }
+                    }
+                )
+                
+                DropdownMenu(
+                    expanded = expandedVar,
+                    onDismissRequest = { expandedVar = false },
+                    modifier = Modifier.fillMaxWidth(0.6f)
+                ) {
+                    if (availableVariables.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("无可用变量") },
+                            onClick = { expandedVar = false },
+                            enabled = false
+                        )
+                    } else {
+                        availableVariables.forEach { variable ->
+                            DropdownMenuItem(
+                                text = { Text(variable) },
+                                onClick = {
+                                    onContentChange(content.copy(variableName = variable))
+                                    expandedVar = false
+                                }
+                            )
+                        }
                     }
                 }
-            )
+            }
+        } else {
+            // 实体变量选择器
+            // Parse current: @type:id:key
+            val parts = content.variableName.removePrefix("@").split(":")
+            val currentType = parts.getOrNull(0) ?: "char"
+            val currentId = parts.getOrNull(1) ?: ""
+            val currentKey = parts.getOrNull(2) ?: ""
             
-            DropdownMenu(
-                expanded = expandedVar,
-                onDismissRequest = { expandedVar = false },
-                modifier = Modifier.fillMaxWidth(0.6f)
-            ) {
-                if (availableVariables.isEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("无可用变量") },
-                        onClick = { expandedVar = false },
-                        enabled = false
+            val entityTypes = listOf("char" to "角色", "loc" to "地点", "item" to "道具")
+            
+            // 实体类型
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                entityTypes.forEach { (type, label) ->
+                    FilterChip(
+                        selected = currentType == type,
+                        onClick = { 
+                            // Switch type, try to pick first entity of that type
+                            val newId = when(type) {
+                                "char" -> characters.firstOrNull()?.id ?: ""
+                                "loc" -> locations.firstOrNull()?.id ?: ""
+                                "item" -> items.firstOrNull()?.id ?: ""
+                                else -> ""
+                            }
+                            onContentChange(content.copy(variableName = "@$type:$newId:"))
+                        },
+                        label = { Text(label) }
                     )
-                } else {
-                    availableVariables.forEach { variable ->
+                }
+            }
+            
+            // 实体选择
+            val availableEntities = when(currentType) {
+                "char" -> characters.map { it.id to it.name }
+                "loc" -> locations.map { it.id to it.name }
+                "item" -> items.map { it.id to it.name }
+                else -> emptyList()
+            }
+            
+            var entityExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = entityExpanded,
+                onExpandedChange = { entityExpanded = !entityExpanded }
+            ) {
+                OutlinedTextField(
+                    value = availableEntities.find { it.first == currentId }?.second ?: currentId,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("选择实体") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = entityExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = entityExpanded,
+                    onDismissRequest = { entityExpanded = false }
+                ) {
+                    availableEntities.forEach { (id, name) ->
                         DropdownMenuItem(
-                            text = { Text(variable) },
+                            text = { Text(name) },
                             onClick = {
-                                onContentChange(content.copy(variableName = variable))
-                                expandedVar = false
+                                onContentChange(content.copy(variableName = "@$currentType:$id:$currentKey"))
+                                entityExpanded = false
                             }
                         )
+                    }
+                }
+            }
+            
+            // 变量名选择
+            val availableEntityVars = when(currentType) {
+                "char" -> characters.find { it.id == currentId }?.variables?.keys?.toList() ?: emptyList()
+                "loc" -> locations.find { it.id == currentId }?.variables?.keys?.toList() ?: emptyList()
+                "item" -> items.find { it.id == currentId }?.variables?.keys?.toList() ?: emptyList()
+                else -> emptyList()
+            }
+            
+            var varExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = varExpanded,
+                onExpandedChange = { varExpanded = !varExpanded }
+            ) {
+                OutlinedTextField(
+                    value = currentKey,
+                    onValueChange = { newKey ->
+                         onContentChange(content.copy(variableName = "@$currentType:$currentId:$newKey"))
+                    },
+                    label = { Text("变量名") },
+                    trailingIcon = { 
+                        if (availableEntityVars.isNotEmpty()) {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = varExpanded) 
+                        }
+                    },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    placeholder = { Text("例如: loyalty") }
+                )
+                if (availableEntityVars.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = varExpanded,
+                        onDismissRequest = { varExpanded = false }
+                    ) {
+                        availableEntityVars.forEach { vName ->
+                            DropdownMenuItem(
+                                text = { Text(vName) },
+                                onClick = {
+                                    onContentChange(content.copy(variableName = "@$currentType:$currentId:$vName"))
+                                    varExpanded = false
+                                }
+                            )
+                        }
                     }
                 }
             }

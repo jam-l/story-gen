@@ -320,6 +320,79 @@ class StoryEngine(
             return false
         }
     }
+
+    /**
+     * 执行变量操作
+     */
+    fun executeVariableAction(action: NodeContent.VariableAction) {
+        val state = currentGameState ?: return
+        val variables = state.variables
+        val entityVariables = state.entityVariables
+        
+        val key = action.variableName
+        val isEntityVar = key.startsWith("@")
+        val storageKey = if (isEntityVar) key.removePrefix("@") else key
+        
+        // 1. 获取当前值 (Current Value)
+        var currentValueStr = if (isEntityVar) {
+            // Priority: Dynamic State -> Static Story Definition -> Default "0"
+            entityVariables[storageKey] ?: run {
+                // Parse storageKey "type:id:varKey" to find initial value from Story
+                val parts = storageKey.split(":")
+                if (parts.size >= 3) {
+                     val type = parts[0]
+                     val id = parts[1]
+                     val varKey = parts[2]
+                     val story = currentStory
+                     when(type) {
+                        "char" -> story?.characters?.find { it.id == id }?.variables?.get(varKey)
+                        "loc" -> story?.locations?.find { it.id == id }?.variables?.get(varKey)
+                        "item" -> story?.items?.find { it.id == id }?.variables?.get(varKey)
+                        else -> null
+                    }
+                } else null
+            } ?: "0"
+        } else {
+            variables[key] ?: "0"
+        }
+        
+        // 2. 解析操作数 (Operand Value) 
+        // 支持引用其他变量吗？暂不支持，只支持字面量。如果 value 是数字字符串则处理为数字。
+        val operandStr = action.value
+        
+        // 3. 执行操作
+        // 尝试以数字方式操作，如果失败则回退到字符串操作
+        val currentNum = currentValueStr.toDoubleOrNull()
+        val operandNum = operandStr.toDoubleOrNull()
+        
+        var newValueStr = currentValueStr
+        
+        if (currentNum != null && operandNum != null) {
+            val result = when (action.operation) {
+                VariableOperation.SET -> operandNum
+                VariableOperation.ADD -> currentNum + operandNum
+                VariableOperation.SUBTRACT -> currentNum - operandNum
+                VariableOperation.MULTIPLY -> currentNum * operandNum
+                VariableOperation.DIVIDE -> if (operandNum != 0.0) currentNum / operandNum else currentNum
+            }
+            // 如果是整数（如 5.0），转为 "5"；否则保留 "5.5"
+            newValueStr = if (result % 1.0 == 0.0) result.toLong().toString() else result.toString()
+        } else {
+            // String operations
+            newValueStr = when (action.operation) {
+                VariableOperation.SET -> operandStr
+                VariableOperation.ADD -> currentValueStr + operandStr // String concat
+                else -> currentValueStr // 其他操作对字符串不支持，保持原值
+            }
+        }
+        
+        // 4. 保存结果
+        if (isEntityVar) {
+            entityVariables[storageKey] = newValueStr
+        } else {
+            variables[key] = newValueStr
+        }
+    }
     
     /**
      * 应用效果
