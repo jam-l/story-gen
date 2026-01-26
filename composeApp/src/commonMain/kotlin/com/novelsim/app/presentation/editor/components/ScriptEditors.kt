@@ -15,6 +15,7 @@ import com.novelsim.app.data.model.*
 /**
  * 变量操作编辑器
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VariableEditor(
     content: NodeContent.VariableAction,
