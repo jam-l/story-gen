@@ -40,6 +40,7 @@ import com.novelsim.app.presentation.editor.database.DatabaseEditor
 import org.koin.core.parameter.parametersOf
 import kotlin.math.roundToInt
 import com.novelsim.app.util.PlatformUtils
+import kotlinx.coroutines.launch
 
 /**
  * 可视化剧情编辑器屏幕
@@ -53,8 +54,11 @@ data class EditorScreen(
         val screenModel = koinScreenModel<EditorScreenModel> { parametersOf(storyId) }
         val uiState by screenModel.uiState.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
+        val snackbarHostState = remember { SnackbarHostState() }
+        val scope = rememberCoroutineScope()
         
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 EditorTopBar(
                     title = uiState.storyTitle,
@@ -65,14 +69,20 @@ data class EditorScreen(
                             navigator.pop()
                         }
                     },
-                    onSave = { screenModel.saveStory() },
+                    onSave = { 
+                        screenModel.saveStory {
+                            scope.launch { snackbarHostState.showSnackbar("保存成功") }
+                        }
+                    },
                     onExport = { 
                         val json = screenModel.exportToJson()
                         println("Exported JSON: $json") // Temporary: print to console
                     },
                     onTitleChange = { screenModel.updateStoryTitle(it) },
                     onToggleViewMode = { screenModel.toggleViewMode() },
-                    onOpenDatabase = { screenModel.toggleDatabaseEditor(true) }
+                    onOpenDatabase = { screenModel.toggleDatabaseEditor(true) },
+                    connectionDisplayMode = uiState.connectionDisplayMode,
+                    onConnectionModeChange = { screenModel.setConnectionDisplayMode(it) }
                 )
             },
             floatingActionButton = {
@@ -114,6 +124,8 @@ data class EditorScreen(
                                 scale = uiState.canvasScale,
                                 offsetX = uiState.canvasOffsetX,
                                 offsetY = uiState.canvasOffsetY,
+                                connectionDisplayMode = uiState.connectionDisplayMode,
+                                selectedNodeId = uiState.selectedNode?.id,
                                 onNodeSelect = { screenModel.selectNode(it) },
                                 onNodeMove = { id, x, y -> screenModel.moveNode(id, x, y) },
                                 onScaleChange = { screenModel.updateCanvasScale(it) },
@@ -187,9 +199,12 @@ private fun EditorTopBar(
     onExport: () -> Unit,
     onTitleChange: (String) -> Unit,
     onToggleViewMode: () -> Unit,
-    onOpenDatabase: () -> Unit
+    onOpenDatabase: () -> Unit,
+    connectionDisplayMode: EditorScreenModel.ConnectionDisplayMode,
+    onConnectionModeChange: (EditorScreenModel.ConnectionDisplayMode) -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
     var editedTitle by remember(title) { mutableStateOf(title) }
     
     TopAppBar(
@@ -230,11 +245,6 @@ private fun EditorTopBar(
             }
         },
         actions = {
-            // 数据库管理按钮
-            IconButton(onClick = onOpenDatabase) {
-                Icon(Icons.Default.Settings, contentDescription = "数据库管理")
-            }
-            
             // 视图切换按钮
             IconButton(onClick = onToggleViewMode) {
                 Icon(
@@ -242,29 +252,80 @@ private fun EditorTopBar(
                     contentDescription = if (isListMode) "切换到画布" else "切换到列表"
                 )
             }
-            
+
             if (isEditing) {
                 IconButton(onClick = {
                     onTitleChange(editedTitle)
                     isEditing = false
                     onSave()
                 }) {
-                    Icon(Icons.Default.Check, contentDescription = "确认")
+                    Icon(Icons.Default.Check, contentDescription = "确认标题修改")
                 }
             }
             
-            IconButton(onClick = onExport) {
-                Icon(Icons.Default.Share, contentDescription = "导出")
-            }
-            
+            // 保存按钮 / 加载指示器
             if (isSaving) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(24.dp).padding(4.dp),
                     strokeWidth = 2.dp
                 )
             } else {
                 IconButton(onClick = onSave) {
                     Icon(Icons.Default.Done, contentDescription = "保存")
+                }
+            }
+            
+            // 更多菜单
+            Box {
+                IconButton(onClick = { showOverflowMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多选项")
+                }
+                DropdownMenu(
+                    expanded = showOverflowMenu,
+                    onDismissRequest = { showOverflowMenu = false }
+                ) {
+                    // 数据库管理
+                    DropdownMenuItem(
+                        text = { Text("数据库管理") },
+                        onClick = {
+                            onOpenDatabase()
+                            showOverflowMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                    )
+                    
+                    // 导出
+                    DropdownMenuItem(
+                        text = { Text("导出故事") },
+                        onClick = {
+                            onExport()
+                            showOverflowMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+                    )
+                    
+                    Divider()
+                    
+                    // 连线显示模式
+                    Text(
+                        text = "连线显示",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    EditorScreenModel.ConnectionDisplayMode.entries.forEach { mode ->
+                        DropdownMenuItem(
+                            text = { Text(mode.label) },
+                            onClick = {
+                                onConnectionModeChange(mode)
+                                showOverflowMenu = false
+                            },
+                            leadingIcon = if (mode == connectionDisplayMode) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null
+                        )
+                    }
                 }
             }
         }
@@ -277,6 +338,8 @@ private fun NodeEditorCanvas(
     scale: Float,
     offsetX: Float,
     offsetY: Float,
+    connectionDisplayMode: EditorScreenModel.ConnectionDisplayMode,
+    selectedNodeId: String?,
     onNodeSelect: (String?) -> Unit,
     onNodeMove: (String, Float, Float) -> Unit,
     onScaleChange: (Float) -> Unit,
@@ -285,6 +348,7 @@ private fun NodeEditorCanvas(
     val currentScale by rememberUpdatedState(scale)
     val currentOffsetX by rememberUpdatedState(offsetX)
     val currentOffsetY by rememberUpdatedState(offsetY)
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
 
     BoxWithConstraints(
         modifier = Modifier
@@ -306,16 +370,12 @@ private fun NodeEditorCanvas(
         val viewportHeight = constraints.maxHeight
         
         // Culling: Calculate visible nodes
-        // Node width is roughly 160.dp * scale. Let's use a safe margin.
-        val nodeWidthPx = 160 * scale * 3 // explicit density conversion omitted for simplicity, using rough factor
-        val nodeHeightPx = 200 * scale * 3 
-        // 3 is usually density approx on high DPI screens, but accessing local density is better.
-        // However, constraints are in pixels. dp to px requires LocalDensity.
-        
-        // Let's iterate all nodes for Canvas, but filter for Composable
+        // Node width is roughly 160.dp * scale
+        val nodeWidthPx = 160 * scale * density
+        val nodeHeightPx = 200 * scale * density
         
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val gridSize = 50f * scale
+            val gridSize = 50f * scale * density
             val startX = (offsetX % gridSize)
             val startY = (offsetY % gridSize)
             
@@ -345,41 +405,54 @@ private fun NodeEditorCanvas(
         Canvas(modifier = Modifier.fillMaxSize()) {
             nodes.forEach { editorNode ->
                 val fromNode = editorNode.node
-                val fromX = fromNode.position.x * scale + offsetX + 80f * scale
-                val fromY = fromNode.position.y * scale + offsetY + 40f * scale
+                val fromX = fromNode.position.x * scale + offsetX + 160f * scale * density // Right edge
+                val fromY = fromNode.position.y * scale + offsetY + 50f * scale * density  // Approx Center Y
                 
                 fromNode.connections.forEach { connection ->
                     val toNode = nodes.find { it.node.id == connection.targetNodeId }?.node
                     if (toNode != null) {
-                        val toX = toNode.position.x * scale + offsetX
-                        val toY = toNode.position.y * scale + offsetY + 40f * scale
+                        // Connection Visibility Logic
+                        val shouldDraw = when (connectionDisplayMode) {
+                            EditorScreenModel.ConnectionDisplayMode.ALL -> true
+                            EditorScreenModel.ConnectionDisplayMode.SELECTED_OUTGOING -> fromNode.id == selectedNodeId
+                            EditorScreenModel.ConnectionDisplayMode.SELECTED_INCOMING -> toNode.id == selectedNodeId
+                        }
                         
-                        // Simple culling for connection lines:
-                        // Only draw if at least one point is somewhat near the viewport
-                        // or just rely on Skia clipping which is fast.
-                        // Given complexity of Bezier, let's keep drawing all for now,
-                        // or just simple bounding box check of the two points.
-                        
-                        val minX = minOf(fromX, toX)
-                        val maxX = maxOf(fromX, toX)
-                        val minY = minOf(fromY, toY)
-                        val maxY = maxOf(fromY, toY)
-                        
-                        if (maxX >= 0 && minX <= size.width && maxY >= 0 && minY <= size.height) {
-                             val path = Path().apply {
-                                moveTo(fromX, fromY)
-                                val controlX1 = fromX + 50f * scale
-                                val controlX2 = toX - 50f * scale
-                                cubicTo(controlX1, fromY, controlX2, toY, toX, toY)
-                            }
+                        if (shouldDraw) {
+                            val toX = toNode.position.x * scale + offsetX // Left edge
+                            val toY = toNode.position.y * scale + offsetY + 50f * scale * density
                             
-                            drawPath(
-                                path = path,
-                                color = Color(0xFF5C6BC0),
-                                style = Stroke(width = 2f * scale)
-                            )
+                            // Culling check
+                            val minX = minOf(fromX, toX)
+                            val maxX = maxOf(fromX, toX)
+                            val minY = minOf(fromY, toY)
+                            val maxY = maxOf(fromY, toY)
                             
-                            val arrowSize = 8f * scale
+                            if (maxX >= 0 && minX <= size.width && maxY >= 0 && minY <= size.height) {
+                                 val path = Path().apply {
+                                    moveTo(fromX, fromY)
+                                    val controlX1 = fromX + 50f * scale * density
+                                    val controlX2 = toX - 50f * scale * density
+                                    cubicTo(controlX1, fromY, controlX2, toY, toX, toY)
+                                }
+                                
+                                // Draw connection line
+                                drawPath(
+                                    path = path,
+                                    color = Color(0xFF5C6BC0),
+                                    style = Stroke(width = 2f * scale * density)
+                                )
+                                
+                                // Draw start dot
+                                drawCircle(
+                                    color = Color(0xFF5C6BC0),
+                                    radius = 4f * scale * density,
+                                    center = Offset(fromX, fromY)
+                                )
+
+                            
+                            // Draw end arrow
+                            val arrowSize = 8f * scale * density
                             drawPath(
                                 path = Path().apply {
                                     moveTo(toX, toY)
@@ -393,9 +466,8 @@ private fun NodeEditorCanvas(
                     }
                 }
             }
-        }
+        } }
         
-        val density = androidx.compose.ui.platform.LocalDensity.current.density
         // Optimization: Filter nodes to only render those within the viewport
         val visibleNodes = remember(nodes, scale, offsetX, offsetY, viewportWidth, viewportHeight) {
             nodes.filter { editorNode ->
@@ -769,7 +841,12 @@ private fun NodeEditorPanel(
                 item {
                     when (val content = node.content) {
                         is NodeContent.Dialogue -> {
-                            DialogueEditor(content, characters, onContentChange)
+                            DialogueEditor(
+                                content = content,
+                                availableNodes = allNodes.map { it.node },
+                                characters = characters,
+                                onContentChange = onContentChange
+                            )
                         }
                         is NodeContent.Choice -> {
                             ChoiceEditor(
@@ -866,6 +943,7 @@ private fun NodeEditorPanel(
 @Composable
 private fun DialogueEditor(
     content: NodeContent.Dialogue,
+    availableNodes: List<StoryNode>,
     characters: List<Character>,
     onContentChange: (NodeContent) -> Unit
 ) {
@@ -932,6 +1010,14 @@ private fun DialogueEditor(
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             maxLines = 10
+        )
+        
+        // 下一节点选择
+        NodeSelector(
+            label = "点击后跳转到",
+            selectedNodeId = content.nextNodeId,
+            availableNodes = availableNodes,
+            onNodeSelect = { onContentChange(content.copy(nextNodeId = it)) }
         )
     }
 }

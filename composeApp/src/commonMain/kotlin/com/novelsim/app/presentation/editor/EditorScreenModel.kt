@@ -56,8 +56,15 @@ class EditorScreenModel(
         val factions: List<Faction> = emptyList(), // 阵营列表
         val enemies: List<Enemy> = emptyList(), // 怪物列表
         val items: List<Item> = emptyList(), // 道具列表
-        val variables: List<String> = emptyList() // 变量列表 (Key only)
+        val variables: List<String> = emptyList(), // 变量列表 (Key only)
+        val connectionDisplayMode: ConnectionDisplayMode = ConnectionDisplayMode.ALL
     )
+
+    enum class ConnectionDisplayMode(val label: String) {
+        ALL("显示全部连线"),
+        SELECTED_OUTGOING("仅显示选中流出"),
+        SELECTED_INCOMING("仅显示选中流入")
+    }
     
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -89,6 +96,7 @@ class EditorScreenModel(
                     story = story,
                     storyTitle = story.title,
                     storyDescription = story.description,
+                    isListMode = story.variables["__editor_view_mode__"] == "list",
                     nodes = story.nodes.values.map { EditorNode(it) }
                 )
                 // 加载关联数据
@@ -118,7 +126,8 @@ class EditorScreenModel(
             type = NodeType.DIALOGUE,
             content = NodeContent.Dialogue(
                 speaker = "旁白",
-                text = "故事开始..."
+                text = "故事开始...",
+                nextNodeId = ""
             ),
             position = NodePosition(200f, 200f)
         )
@@ -139,7 +148,7 @@ class EditorScreenModel(
         val nodeId = "node_${PlatformUtils.getCurrentTimeMillis()}"
         
         val content: NodeContent = when (type) {
-            NodeType.DIALOGUE -> NodeContent.Dialogue(text = "新对话内容")
+            NodeType.DIALOGUE -> NodeContent.Dialogue(text = "新对话内容", nextNodeId = "")
             NodeType.CHOICE -> NodeContent.Choice(
                 prompt = "请选择",
                 options = listOf(
@@ -241,10 +250,29 @@ class EditorScreenModel(
      * 更新节点内容
      */
     fun updateNodeContent(nodeId: String, content: NodeContent) {
+        val targetIds = when (content) {
+            is NodeContent.Dialogue -> listOf(content.nextNodeId)
+            is NodeContent.Battle -> listOf(content.winNextNodeId, content.loseNextNodeId)
+            is NodeContent.Condition -> listOf(content.trueNextNodeId, content.falseNextNodeId)
+            is NodeContent.ItemAction -> listOf(content.nextNodeId)
+            is NodeContent.VariableAction -> listOf(content.nextNodeId)
+            is NodeContent.Choice -> content.options.map { it.nextNodeId }
+            is NodeContent.Random -> content.branches.map { it.nextNodeId }
+            is NodeContent.Ending -> emptyList()
+        }
+        
+        val newConnections = targetIds
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .map { Connection(it) }
+
         _uiState.value = _uiState.value.copy(
             nodes = _uiState.value.nodes.map { editorNode ->
                 if (editorNode.node.id == nodeId) {
-                    val updatedNode = editorNode.node.copy(content = content)
+                    val updatedNode = editorNode.node.copy(
+                        content = content,
+                        connections = newConnections
+                    )
                     editorNode.copy(node = updatedNode)
                 } else {
                     editorNode
@@ -341,6 +369,10 @@ class EditorScreenModel(
     fun toggleDatabaseEditor(show: Boolean) {
         _uiState.update { it.copy(showDatabaseEditor = show) }
     }
+    
+    fun setConnectionDisplayMode(mode: ConnectionDisplayMode) {
+        _uiState.update { it.copy(connectionDisplayMode = mode) }
+    }
 
     /**
      * 切换视图模式
@@ -369,28 +401,43 @@ class EditorScreenModel(
      */
     fun saveStory(onSaved: () -> Unit = {}) {
         screenModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true)
+            _uiState.update { it.copy(isSaving = true) }
             
             val nodesMap = _uiState.value.nodes.associate { it.node.id to it.node }
             val startNodeId = _uiState.value.nodes.firstOrNull()?.node?.id ?: "start"
+            val currentVariables = _uiState.value.story?.variables?.toMutableMap() ?: mutableMapOf()
+            
+            // 保存编辑器视图模式到变量中
+            currentVariables["__editor_view_mode__"] = if (_uiState.value.isListMode) "list" else "canvas"
             
             val story = Story(
-                id = storyId ?: "story_${PlatformUtils.getCurrentTimeMillis()}",
+                id = _uiState.value.story?.id ?: "story_${PlatformUtils.getCurrentTimeMillis()}",
                 title = _uiState.value.storyTitle,
                 author = "用户",
                 description = _uiState.value.storyDescription,
                 startNodeId = startNodeId,
                 nodes = nodesMap,
+                variables = currentVariables,
+                characters = _uiState.value.characters,
+                locations = _uiState.value.locations,
+                events = _uiState.value.events,
+                clues = _uiState.value.clues,
+                factions = _uiState.value.factions,
+                enemies = _uiState.value.enemies,
+                items = _uiState.value.items,
                 createdAt = _uiState.value.story?.createdAt ?: PlatformUtils.getCurrentTimeMillis(),
                 updatedAt = PlatformUtils.getCurrentTimeMillis()
             )
             
             storyRepository.saveStory(story)
             
-            _uiState.value = _uiState.value.copy(
-                isSaving = false,
-                story = story
-            )
+            _uiState.update { 
+                it.copy(
+                    isSaving = false,
+                    story = story,
+                    variables = currentVariables.keys.toList()
+                )
+            }
             onSaved()
         }
     }

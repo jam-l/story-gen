@@ -68,7 +68,8 @@ sealed class NodeContent {
         val speaker: String? = null,
         val text: String,
         val portrait: String? = null,
-        val background: String? = null
+        val background: String? = null,
+        val nextNodeId: String = ""
     ) : NodeContent()
     
     /**

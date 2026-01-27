@@ -360,7 +360,7 @@ class RandomStoryGenerator(
         val mainDialogueCount = nodeCount - choiceCount - endingCount
         for (i in 0 until mainDialogueCount) {
             val nodeId = "node_${i + 1}"
-            currentY += 120f
+            currentY += 200f
             
             // 根据概率决定节点类型
             val nodeType = when {
@@ -390,7 +390,7 @@ class RandomStoryGenerator(
         for (i in 0 until choiceCount) {
             val nodeId = "choice_${i + 1}"
             currentX += 200f * (if (i % 2 == 0) 1 else -1)
-            currentY += 120f
+            currentY += 200f
             
             val optionCount = random.nextInt(config.minOptions, config.maxOptions + 1)
             val node = createChoiceNode(nodeId, currentX, currentY, optionCount)
@@ -402,7 +402,7 @@ class RandomStoryGenerator(
         for (i in 0 until endingCount) {
             val nodeId = "ending_${i + 1}"
             currentX = 100f + (i * 180f)
-            currentY += 120f
+            currentY += 200f
             
             val node = createEndingNode(nodeId, currentX, currentY)
             nodes[node.id] = node
@@ -741,7 +741,8 @@ class RandomStoryGenerator(
             content = NodeContent.Dialogue(
                 speaker = speaker,
                 text = template.second,
-                portrait = template.third
+                portrait = template.third,
+                nextNodeId = ""
             ),
             position = NodePosition(x, y)
         )
@@ -905,10 +906,10 @@ class RandomStoryGenerator(
         val types = listOf("sword", "blade") // 目前 rules.json 只有这两种的生成逻辑
         val type = types.random(random)
         val templateId = "weapon_$type" // 假设基础模板ID
-        
+
         // 生成名字
         val customName = nameProvider!!.getEquipmentName(type)
-        
+
         // 生成属性
         val level = random.nextInt(1, (10 * config.difficulty).toInt() + 2)
         // 稀有度
@@ -920,7 +921,7 @@ class RandomStoryGenerator(
             rarityRoll < 0.99 -> ItemRarity.EPIC
             else -> ItemRarity.LEGENDARY
         }
-        
+
         // 属性加成计算 (简单的线性成长 + 稀有度倍率)
         val rarityMultiplier = when(rarity) {
             ItemRarity.COMMON -> 1.0f
@@ -930,11 +931,11 @@ class RandomStoryGenerator(
             ItemRarity.LEGENDARY -> 6.0f
             ItemRarity.MYTHIC -> 10.0f
         }
-        
+
         val baseStat = (level * 2 * rarityMultiplier).toInt()
         val atk = baseStat + random.nextInt(level)
         val def = if (random.nextBoolean()) (baseStat * 0.5).toInt() else 0
-        
+
         return ItemInstance(
             uid = "inst_${PlatformUtils.getCurrentTimeMillis()}_${random.nextInt(10000)}",
             templateId = templateId,
@@ -946,20 +947,20 @@ class RandomStoryGenerator(
             creationTime = PlatformUtils.getCurrentTimeMillis()
         )
     }
-    
+
     private fun createVariableNode(id: String, x: Float, y: Float, generatedVariables: Map<String, String>): StoryNode {
         val operations = listOf(VariableOperation.ADD, VariableOperation.SET)
         // 难度越高，获得的奖励数值越低
         val baseValue = 100 - (config.difficulty * 80).toInt()
         val value = random.nextInt(1, maxOf(10, baseValue)).toString()
-        
+
         // Pick from generated variables
         val variableName = if (generatedVariables.isNotEmpty()) {
              generatedVariables.keys.random(random)
         } else {
              "score"
         }
-        
+
         return StoryNode(
             id = id,
             type = NodeType.VARIABLE,
@@ -972,12 +973,12 @@ class RandomStoryGenerator(
             position = NodePosition(x, y)
         )
     }
-    
+
     private fun createRandomNode(id: String, x: Float, y: Float): StoryNode {
         // 创建 2-3 个随机分支
         val branchCount = random.nextInt(2, 4)
         val branches = mutableListOf<RandomBranch>()
-        
+
         // 分配权重 (总和不需要严格为100，这里简单随机分配)
         for (i in 0 until branchCount) {
             branches.add(
@@ -987,7 +988,7 @@ class RandomStoryGenerator(
                 )
             )
         }
-        
+
         return StoryNode(
             id = id,
             type = NodeType.RANDOM,
@@ -998,7 +999,7 @@ class RandomStoryGenerator(
 
     private fun connectNodes(nodes: MutableMap<String, StoryNode>, nodeIds: List<String>) {
         // 找出不同类型的节点
-        val dialogueNodes = nodeIds.filter { 
+        val dialogueNodes = nodeIds.filter {
             val node = nodes[it]
             node?.type == NodeType.DIALOGUE || node?.type == NodeType.BATTLE ||
             node?.type == NodeType.ITEM || node?.type == NodeType.VARIABLE ||
@@ -1006,11 +1007,11 @@ class RandomStoryGenerator(
         }
         val choiceNodes = nodeIds.filter { nodes[it]?.type == NodeType.CHOICE }
         val endingNodes = nodeIds.filter { nodes[it]?.type == NodeType.END }
-        
+
         // 连接对话节点链
         for (i in 0 until dialogueNodes.size - 1) {
             val currentId = dialogueNodes[i]
-            
+
             // Chaos 逻辑：有一定概率连接到随机节点（跳跃或回环），而不是下一个节点
             // 避免连接到自己，且目标必须是 dialogueNodes 中的。
             val nextId = if (random.nextFloat() < config.chaos && dialogueNodes.size > 2) {
@@ -1023,20 +1024,20 @@ class RandomStoryGenerator(
                     dialogueNodes[i + 1]
                 }
             }
-            
+
             val currentNode = nodes[currentId]!!
             val connection = Connection(nextId)
             nodes[currentId] = currentNode.copy(connections = listOf(connection))
-            
+
             // 更新特殊节点的 nextNodeId
             updateNodeNextId(nodes, currentId, nextId)
         }
-        
+
         // 连接选择节点的选项到不同目标
         choiceNodes.forEach { choiceId ->
             val choiceNode = nodes[choiceId]!!
             val choice = choiceNode.content as NodeContent.Choice
-            
+
             val updatedOptions = choice.options.mapIndexed { index, option ->
                 // Chaos 逻辑也会影响选项的目标
                 val targetId = if (random.nextFloat() < config.chaos && dialogueNodes.isNotEmpty()) {
@@ -1061,29 +1062,33 @@ class RandomStoryGenerator(
                 option.copy(nextNodeId = targetId)
             }
             
+            val newConnections = updatedOptions.map { Connection(it.nextNodeId) }
+            
             nodes[choiceId] = choiceNode.copy(
-                content = choice.copy(options = updatedOptions)
+                content = choice.copy(options = updatedOptions),
+                connections = newConnections
             )
         }
-        
+
         // 确保最后的对话节点连接到结局
         if (dialogueNodes.isNotEmpty() && endingNodes.isNotEmpty()) {
             val lastDialogueId = dialogueNodes.last()
-            
+
             // 检查如果不包含连接才添加，避免覆盖之前的逻辑（如果有）
             // 简单起见，这里强制连接最后一个，除非它已经有连接（在 chaos 逻辑中可能已经有）
             val lastNode = nodes[lastDialogueId]!!
-            if (lastNode.connections.isEmpty() || lastNode.connections[0].targetNodeId.isEmpty()) { 
+            if (lastNode.connections.isEmpty() || lastNode.connections[0].targetNodeId.isEmpty()) {
                 val endingId = endingNodes.first()
                 nodes[lastDialogueId] = lastNode.copy(connections = listOf(Connection(endingId)))
                 updateNodeNextId(nodes, lastDialogueId, endingId)
             }
         }
     }
-    
+
     private fun updateNodeNextId(nodes: MutableMap<String, StoryNode>, nodeId: String, nextId: String) {
         val node = nodes[nodeId] ?: return
         val updatedContent = when (val content = node.content) {
+            is NodeContent.Dialogue -> content.copy(nextNodeId = nextId)
             is NodeContent.Battle -> content.copy(winNextNodeId = nextId)
             is NodeContent.Condition -> content.copy(trueNextNodeId = nextId, falseNextNodeId = nextId)
             is NodeContent.ItemAction -> content.copy(nextNodeId = nextId)
