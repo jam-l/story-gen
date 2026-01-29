@@ -31,6 +31,8 @@ import com.novelsim.app.data.model.*
 import com.novelsim.app.domain.rpg.BattleSystem
 import org.koin.core.parameter.parametersOf
 
+import com.novelsim.app.presentation.player.components.EntityVariableViewer
+
 /**
  * 故事播放器屏幕
  */
@@ -73,7 +75,8 @@ data class StoryPlayerScreen(
                                 onSave = { screenModel.toggleSaveDialog() },
                                 onInventory = { screenModel.toggleInventory() },
                                 onStatus = { screenModel.toggleStatus() },
-                                onHistory = { screenModel.toggleHistory() }
+                                onHistory = { screenModel.toggleHistory() },
+                                onVariable = { screenModel.toggleVariableViewer() }
                             )
                         }
                         StoryPlayerScreenModel.DisplayMode.BATTLE -> {
@@ -132,6 +135,14 @@ data class StoryPlayerScreen(
                     )
                 }
             }
+
+            // 变量查看器
+            if (uiState.showVariableViewer) {
+                EntityVariableViewer(
+                    entityVariables = uiState.gameState?.entityVariables ?: emptyMap(),
+                    onDismiss = { screenModel.toggleVariableViewer() }
+                )
+            }
         }
     }
 }
@@ -145,7 +156,8 @@ private fun StoryContent(
     onSave: () -> Unit,
     onInventory: () -> Unit,
     onStatus: () -> Unit,
-    onHistory: () -> Unit
+    onHistory: () -> Unit,
+    onVariable: () -> Unit
 ) {
     val node = uiState.currentNode ?: return
     
@@ -168,7 +180,8 @@ private fun StoryContent(
             onSave = onSave,
             onInventory = onInventory,
             onStatus = onStatus,
-            onHistory = onHistory
+            onHistory = onHistory,
+            onVariable = onVariable
         )
         
         // 内容区域
@@ -260,7 +273,8 @@ private fun StoryTopBar(
     onSave: () -> Unit,
     onInventory: () -> Unit,
     onStatus: () -> Unit,
-    onHistory: () -> Unit
+    onHistory: () -> Unit,
+    onVariable: () -> Unit
 ) {
     TopAppBar(
         title = { },
@@ -270,6 +284,9 @@ private fun StoryTopBar(
             }
         },
         actions = {
+            IconButton(onClick = onVariable) {
+                Icon(Icons.Default.Info, contentDescription = "变量")
+            }
             IconButton(onClick = onStatus) {
                 Icon(Icons.Default.Person, contentDescription = "状态")
             }

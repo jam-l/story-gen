@@ -24,6 +24,8 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import com.novelsim.app.presentation.generator.components.CustomStatConfigEditor
+import com.novelsim.app.domain.generator.RandomStoryGenerator.CustomStatConfig
 
 class GeneratorScreen : Screen {
     @Composable
@@ -158,6 +160,26 @@ private fun GeneratorScreenContent(
     var chaos by remember { mutableStateOf(0.1f) }
     var difficulty by remember { mutableStateOf(0.5f) }
     
+    // Enemy Stats Params
+    var enemyMinHp by remember { mutableStateOf(50f) }
+    var enemyMaxHp by remember { mutableStateOf(200f) }
+    var enemyMinAtk by remember { mutableStateOf(5f) }
+    var enemyMaxAtk by remember { mutableStateOf(20f) }
+    var enemyMinDef by remember { mutableStateOf(0f) }
+    var enemyMaxDef by remember { mutableStateOf(10f) }
+    var enemyMinSpeed by remember { mutableStateOf(5f) }
+    var enemyMaxSpeed by remember { mutableStateOf(15f) }
+
+    // Character Stats Params
+    var characterMinHp by remember { mutableStateOf(80f) }
+    var characterMaxHp by remember { mutableStateOf(150f) }
+    var characterMinAtk by remember { mutableStateOf(10f) }
+    var characterMaxAtk by remember { mutableStateOf(30f) }
+    var characterMinDef by remember { mutableStateOf(5f) }
+    var characterMaxDef by remember { mutableStateOf(15f) }
+    var characterMinSpeed by remember { mutableStateOf(8f) }
+    var characterMaxSpeed by remember { mutableStateOf(18f) }
+    
     var selectedTheme by remember { mutableStateOf(RandomStoryGenerator.StoryTheme.FANTASY) }
     var selectedNamingStyle by remember { mutableStateOf(RandomStoryGenerator.NamingStyle.AUTO) }
     var useSeed by remember { mutableStateOf(false) }
@@ -172,6 +194,8 @@ private fun GeneratorScreenContent(
     var selectedEventTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedClueTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedFactionTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    
+    var customStatConfigs by remember { mutableStateOf<List<CustomStatConfig>>(emptyList()) }
     
     LaunchedEffect(allTemplates) {
         // Default selections (intelligent defaults) if not already selected
@@ -195,7 +219,7 @@ private fun GeneratorScreenContent(
                  selectedClueTemplates = allTemplates.filter { it.id.contains("clue") || it.id.contains("item") }.map { it.id }.toSet()
             }
             if (selectedFactionTemplates.isEmpty()) {
-                 selectedFactionTemplates = allTemplates.filter { it.id.contains("faction") || it.id.contains("org") || it.id.contains("sect") || it.id.contains("skill") }.map { it.id }.toSet()
+                 selectedFactionTemplates = allTemplates.filter { it.id.contains("sect")}.map { it.id }.toSet()
             }
         }
     }
@@ -255,7 +279,24 @@ private fun GeneratorScreenContent(
                         eventTemplateIds = selectedEventTemplates.toList(),
                         clueTemplateIds = selectedClueTemplates.toList(),
                         factionTemplateIds = selectedFactionTemplates.toList(),
-                        seed = if (useSeed) seed.toLongOrNull() else null
+                        seed = if (useSeed) seed.toLongOrNull() else null,
+                        customStats = customStatConfigs,
+                        enemyMinHp = enemyMinHp.toInt(),
+                        enemyMaxHp = enemyMaxHp.toInt(),
+                        enemyMinAtk = enemyMinAtk.toInt(),
+                        enemyMaxAtk = enemyMaxAtk.toInt(),
+                        enemyMinDef = enemyMinDef.toInt(),
+                        enemyMaxDef = enemyMaxDef.toInt(),
+                        enemyMinSpeed = enemyMinSpeed.toInt(),
+                        enemyMaxSpeed = enemyMaxSpeed.toInt(),
+                        characterMinHp = characterMinHp.toInt(),
+                        characterMaxHp = characterMaxHp.toInt(),
+                        characterMinAtk = characterMinAtk.toInt(),
+                        characterMaxAtk = characterMaxAtk.toInt(),
+                        characterMinDef = characterMinDef.toInt(),
+                        characterMaxDef = characterMaxDef.toInt(),
+                        characterMinSpeed = characterMinSpeed.toInt(),
+                        characterMaxSpeed = characterMaxSpeed.toInt()
                     )
                     onGenerate(config, title)
                 },
@@ -446,6 +487,122 @@ private fun GeneratorScreenContent(
                 }
             }
             
+            // Custom Stats Config
+            CustomStatConfigEditor(
+                configs = customStatConfigs,
+                onConfigsChange = { customStatConfigs = it }
+            )
+            
+            // Enemy Base Stats Config
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("敌人基础属性 (Base Stats)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    SliderControl("生命值 (HP)", "${enemyMinHp.toInt()} - ${enemyMaxHp.toInt()}") {
+                        RangeSlider(
+                            value = enemyMinHp..enemyMaxHp,
+                            onValueChange = { 
+                                enemyMinHp = it.start
+                                enemyMaxHp = it.endInclusive
+                            },
+                            valueRange = 1f..1000f,
+                            steps = 0
+                        )
+                    }
+                    
+                    SliderControl("攻击力 (ATK)", "${enemyMinAtk.toInt()} - ${enemyMaxAtk.toInt()}") {
+                        RangeSlider(
+                            value = enemyMinAtk..enemyMaxAtk,
+                            onValueChange = { 
+                                enemyMinAtk = it.start
+                                enemyMaxAtk = it.endInclusive
+                            },
+                            valueRange = 1f..200f,
+                            steps = 0
+                        )
+                    }
+                    
+                    SliderControl("防御力 (DEF)", "${enemyMinDef.toInt()} - ${enemyMaxDef.toInt()}") {
+                        RangeSlider(
+                            value = enemyMinDef..enemyMaxDef,
+                            onValueChange = { 
+                                enemyMinDef = it.start
+                                enemyMaxDef = it.endInclusive
+                            },
+                            valueRange = 0f..100f,
+                            steps = 0
+                        )
+                    }
+                     
+                    SliderControl("速度 (SPD)", "${enemyMinSpeed.toInt()} - ${enemyMaxSpeed.toInt()}") {
+                        RangeSlider(
+                            value = enemyMinSpeed..enemyMaxSpeed,
+                            onValueChange = { 
+                                enemyMinSpeed = it.start
+                                enemyMaxSpeed = it.endInclusive
+                            },
+                            valueRange = 1f..100f,
+                            steps = 0
+                        )
+                    }
+                }
+            }
+
+            // Character Base Stats Config
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("角色基础属性 (Base Stats)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    SliderControl("生命值 (HP)", "${characterMinHp.toInt()} - ${characterMaxHp.toInt()}") {
+                        RangeSlider(
+                            value = characterMinHp..characterMaxHp,
+                            onValueChange = { 
+                                characterMinHp = it.start
+                                characterMaxHp = it.endInclusive
+                            },
+                            valueRange = 1f..1000f,
+                            steps = 0
+                        )
+                    }
+                    
+                    SliderControl("攻击力 (ATK)", "${characterMinAtk.toInt()} - ${characterMaxAtk.toInt()}") {
+                        RangeSlider(
+                            value = characterMinAtk..characterMaxAtk,
+                            onValueChange = { 
+                                characterMinAtk = it.start
+                                characterMaxAtk = it.endInclusive
+                            },
+                            valueRange = 1f..200f,
+                            steps = 0
+                        )
+                    }
+                    
+                    SliderControl("防御力 (DEF)", "${characterMinDef.toInt()} - ${characterMaxDef.toInt()}") {
+                        RangeSlider(
+                            value = characterMinDef..characterMaxDef,
+                            onValueChange = { 
+                                characterMinDef = it.start
+                                characterMaxDef = it.endInclusive
+                            },
+                            valueRange = 0f..100f,
+                            steps = 0
+                        )
+                    }
+                     
+                    SliderControl("速度 (SPD)", "${characterMinSpeed.toInt()} - ${characterMaxSpeed.toInt()}") {
+                        RangeSlider(
+                            value = characterMinSpeed..characterMaxSpeed,
+                            onValueChange = { 
+                                characterMinSpeed = it.start
+                                characterMaxSpeed = it.endInclusive
+                            },
+                            valueRange = 1f..100f,
+                            steps = 0
+                        )
+                    }
+                }
+            }
+            
             // Core Elements Generation
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -598,7 +755,7 @@ private fun GeneratorScreenContent(
                         
                         Text("阵营生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
                         TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("faction") || it.id.contains("skill") },
+                            templates = allTemplates.filter { it.id.contains("sect") },
                             selectedIds = selectedFactionTemplates,
                             onSelectionChange = { selectedFactionTemplates = it }
                         )

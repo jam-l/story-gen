@@ -326,7 +326,8 @@ data class GameEvent(
     val startNodeId: String,
     val triggerCondition: String? = null,
     val priority: Int = 0,
-    val isRepeatable: Boolean = false
+    val isRepeatable: Boolean = false,
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**
@@ -337,7 +338,8 @@ data class Clue(
     val id: String,
     val name: String,
     val description: String,
-    val isKnown: Boolean = false
+    val isKnown: Boolean = false,
+    val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
 /**

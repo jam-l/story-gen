@@ -35,6 +35,7 @@ class StoryPlayerScreenModel(
         val showInventory: Boolean = false,
         val showStatus: Boolean = false,
         val showHistory: Boolean = false,
+        val showVariableViewer: Boolean = false,
         val isTyping: Boolean = false,
         val displayedText: String = ""
     )
@@ -401,6 +402,15 @@ class StoryPlayerScreenModel(
     fun toggleHistory() {
         _uiState.value = _uiState.value.copy(
             showHistory = !_uiState.value.showHistory
+        )
+    }
+
+    /**
+     * 切换变量查看器显示
+     */
+    fun toggleVariableViewer() {
+        _uiState.value = _uiState.value.copy(
+            showVariableViewer = !_uiState.value.showVariableViewer
         )
     }
 

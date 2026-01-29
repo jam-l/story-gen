@@ -19,6 +19,8 @@ import com.novelsim.app.data.model.CharacterStats
 import com.novelsim.app.data.model.Enemy
 import com.novelsim.app.presentation.editor.EditorScreenModel
 import com.novelsim.app.presentation.editor.components.StatInput
+import com.novelsim.app.presentation.editor.components.CustomStatsEditor
+import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 import androidx.compose.material3.HorizontalDivider
 import com.novelsim.app.util.PlatformUtils
 
@@ -251,8 +253,26 @@ fun EnemyDetailEditor(
                         onSave(enemy.copy(stats = stats))
                     }
                 }
+                }
             }
-        }
+
+        
+        // 自定义数值属性
+        CustomStatsEditor(
+            stats = stats,
+            onStatsChange = { newStats ->
+                stats = newStats
+                onSave(enemy.copy(stats = newStats))
+            }
+        )
+        
+        // 自定义变量 (字符串)
+        EntityVariableEditor(
+            variables = enemy.variables,
+            onVariablesChange = { newVars ->
+                onSave(enemy.copy(variables = newVars))
+            }
+        )
         
         // 奖励
         Card(modifier = Modifier.fillMaxWidth()) {

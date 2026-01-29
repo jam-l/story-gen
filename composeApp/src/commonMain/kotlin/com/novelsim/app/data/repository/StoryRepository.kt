@@ -745,16 +745,20 @@ class StoryRepository(
         // ... (省略其他节点)
 
         // 示例敌人
+        val stats = CharacterStats(
+            maxHp = 30,
+            currentHp = 30,
+            attack = 8,
+            defense = 3
+        )
+        // 演示：添加自定义属性
+        stats["sanity"] = 50 
+        
         val sampleEnemy = Enemy(
             id = "goblin",
             name = "哥布林",
             description = "狡猾的绿皮小怪物",
-            stats = CharacterStats(
-                maxHp = 30,
-                currentHp = 30,
-                attack = 8,
-                defense = 3
-            ),
+            stats = stats,
             expReward = 10,
             goldReward = 5
         )

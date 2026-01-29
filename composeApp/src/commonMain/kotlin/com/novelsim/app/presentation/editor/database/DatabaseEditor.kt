@@ -18,6 +18,7 @@ import com.novelsim.app.presentation.editor.EditorScreenModel
 import com.novelsim.app.data.model.Character
 import com.novelsim.app.presentation.editor.components.StatInput
 import com.novelsim.app.presentation.editor.components.EntityVariableEditor
+import com.novelsim.app.presentation.editor.components.CustomStatsEditor
 
 /**
  * 数据库编辑器主界面
@@ -304,6 +305,15 @@ fun CharacterDetailEditor(
                 }
             }
         }
+        
+        // 自定义数值属性
+        CustomStatsEditor(
+            stats = stats,
+            onStatsChange = { newStats ->
+                stats = newStats
+                onSave(character.copy(baseStats = newStats))
+            }
+        )
         
         // 自定义属性
         EntityVariableEditor(

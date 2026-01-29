@@ -108,6 +108,17 @@
       }
     },
     {
+      "id": "sect_name",
+      "pattern": "{sect}",
+      "description": "门派名",
+      "parts": {
+        "sect": {
+          "file": "diming.json",
+          "path": "sect"
+        }
+      }
+    },
+    {
       "id": "skill_name",
       "pattern": "{prefix}{core}{suffix}",
       "description": "秘籍名称",
