@@ -1,31 +1,71 @@
 package com.novelsim.app.presentation.generator
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
-import com.novelsim.app.domain.generator.RandomStoryGenerator
-import com.novelsim.app.presentation.editor.EditorScreen
-import cafe.adriel.voyager.koin.koinScreenModel
-import com.novelsim.app.data.repository.StoryRepository
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import kotlinx.coroutines.launch
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
+import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
+import com.novelsim.app.data.repository.StoryRepository
+import com.novelsim.app.domain.generator.RandomStoryGenerator
+import com.novelsim.app.presentation.editor.EditorScreen
 import com.novelsim.app.presentation.generator.components.CustomStatConfigEditor
-import com.novelsim.app.domain.generator.RandomStoryGenerator.CustomStatConfig
+import kotlinx.coroutines.launch
 
 class GeneratorScreen : Screen {
     @Composable
@@ -134,71 +174,35 @@ private fun GeneratorScreenContent(
     var itemProbability by remember { mutableStateOf(0.1f) }
     
     // Core Elements Config
-    var minItems by remember { mutableStateOf(2f) }
-    var maxItems by remember { mutableStateOf(5f) }
-    var minVariables by remember { mutableStateOf(2f) }
-    var maxVariables by remember { mutableStateOf(5f) }
-    var minEnemies by remember { mutableStateOf(2f) }
-    var maxEnemies by remember { mutableStateOf(5f) }
+    // Elements Generation Rules
+    var generationRules by remember { 
+        mutableStateOf(listOf(
+            RandomStoryGenerator.GenerationRule(
+                type = RandomStoryGenerator.EntityType.CHARACTER,
+                count = 3
+            ),
+            RandomStoryGenerator.GenerationRule(
+                type = RandomStoryGenerator.EntityType.ITEM,
+                count = 2
+            ),
+            RandomStoryGenerator.GenerationRule(
+                type = RandomStoryGenerator.EntityType.ENEMY,
+                count = 2
+            )
+        )) 
+    }
     
-    var minCharacters by remember { mutableStateOf(3f) }
-    var maxCharacters by remember { mutableStateOf(6f) }
-    
-    var minLocations by remember { mutableStateOf(3f) }
-    var maxLocations by remember { mutableStateOf(6f) }
-    
-    var minEvents by remember { mutableStateOf(2f) }
-    var maxEvents by remember { mutableStateOf(4f) }
-    
-    var minClues by remember { mutableStateOf(2f) }
-    var maxClues by remember { mutableStateOf(5f) }
-    
-    var minFactions by remember { mutableStateOf(2f) }
-    var maxFactions by remember { mutableStateOf(4f) }
-    
-    // New Params
+    // Global Settings
     var chaos by remember { mutableStateOf(0.1f) }
     var difficulty by remember { mutableStateOf(0.5f) }
     
-    // Enemy Stats Params
-    var enemyMinHp by remember { mutableStateOf(50f) }
-    var enemyMaxHp by remember { mutableStateOf(200f) }
-    var enemyMinAtk by remember { mutableStateOf(5f) }
-    var enemyMaxAtk by remember { mutableStateOf(20f) }
-    var enemyMinDef by remember { mutableStateOf(0f) }
-    var enemyMaxDef by remember { mutableStateOf(10f) }
-    var enemyMinSpeed by remember { mutableStateOf(5f) }
-    var enemyMaxSpeed by remember { mutableStateOf(15f) }
-
-    // Character Stats Params
-    var characterMinHp by remember { mutableStateOf(80f) }
-    var characterMaxHp by remember { mutableStateOf(150f) }
-    var characterMinAtk by remember { mutableStateOf(10f) }
-    var characterMaxAtk by remember { mutableStateOf(30f) }
-    var characterMinDef by remember { mutableStateOf(5f) }
-    var characterMaxDef by remember { mutableStateOf(15f) }
-    var characterMinSpeed by remember { mutableStateOf(8f) }
-    var characterMaxSpeed by remember { mutableStateOf(18f) }
-    
     var selectedTheme by remember { mutableStateOf(RandomStoryGenerator.StoryTheme.FANTASY) }
-    var selectedNamingStyle by remember { mutableStateOf(RandomStoryGenerator.NamingStyle.AUTO) }
     var useSeed by remember { mutableStateOf(false) }
     var seed by remember { mutableStateOf("") }
     
-    // Loaded Templates
-    // allTemplates passed from parent
-    var selectedItemTemplate by remember { mutableStateOf<String?>(null) }
-    var selectedEnemyTemplate by remember { mutableStateOf<String?>(null) }
-    var selectedCharacterTemplate by remember { mutableStateOf<String?>(null) }
-    var selectedLocationTemplate by remember { mutableStateOf<String?>(null) }
-    var selectedEventTemplate by remember { mutableStateOf<String?>(null) }
-    var selectedClueTemplate by remember { mutableStateOf<String?>(null) }
-    var selectedFactionTemplate by remember { mutableStateOf<String?>(null) }
-    
-    var customStatConfigs by remember { mutableStateOf<List<CustomStatConfig>>(emptyList()) }
-    
+    // Init logic if needed in future
     LaunchedEffect(allTemplates) {
-        // Init logic if needed in future
+         // No default logic needed
     }
     
     Scaffold(
@@ -229,51 +233,11 @@ private fun GeneratorScreenContent(
                         battleProbability = battleProbability,
                         conditionProbability = conditionProbability,
                         itemProbability = itemProbability,
-                        minRandomItems = minItems.toInt(),
-                        maxRandomItems = maxItems.toInt(),
-                        minRandomVariables = minVariables.toInt(),
-                        maxRandomVariables = maxVariables.toInt(),
-                        minRandomEnemies = minEnemies.toInt(),
-                        maxRandomEnemies = maxEnemies.toInt(),
-                        minRandomCharacters = minCharacters.toInt(),
-                        maxRandomCharacters = maxCharacters.toInt(),
-                        minRandomLocations = minLocations.toInt(),
-                        maxRandomLocations = maxLocations.toInt(),
-                        minRandomEvents = minEvents.toInt(),
-                        maxRandomEvents = maxEvents.toInt(),
-                        minRandomClues = minClues.toInt(),
-                        maxRandomClues = maxClues.toInt(),
-                        minRandomFactions = minFactions.toInt(),
-                        maxRandomFactions = maxFactions.toInt(),
                         chaos = chaos,
                         difficulty = difficulty,
                         theme = selectedTheme,
-                        namingStyle = selectedNamingStyle,
-                        itemTemplateIds = listOfNotNull(selectedItemTemplate),
-                        enemyTemplateIds = listOfNotNull(selectedEnemyTemplate),
-                        characterTemplateIds = listOfNotNull(selectedCharacterTemplate),
-                        locationTemplateIds = listOfNotNull(selectedLocationTemplate),
-                        eventTemplateIds = listOfNotNull(selectedEventTemplate),
-                        clueTemplateIds = listOfNotNull(selectedClueTemplate),
-                        factionTemplateIds = listOfNotNull(selectedFactionTemplate),
                         seed = if (useSeed) seed.toLongOrNull() else null,
-                        customStats = customStatConfigs,
-                        enemyMinHp = enemyMinHp.toInt(),
-                        enemyMaxHp = enemyMaxHp.toInt(),
-                        enemyMinAtk = enemyMinAtk.toInt(),
-                        enemyMaxAtk = enemyMaxAtk.toInt(),
-                        enemyMinDef = enemyMinDef.toInt(),
-                        enemyMaxDef = enemyMaxDef.toInt(),
-                        enemyMinSpeed = enemyMinSpeed.toInt(),
-                        enemyMaxSpeed = enemyMaxSpeed.toInt(),
-                        characterMinHp = characterMinHp.toInt(),
-                        characterMaxHp = characterMaxHp.toInt(),
-                        characterMinAtk = characterMinAtk.toInt(),
-                        characterMaxAtk = characterMaxAtk.toInt(),
-                        characterMinDef = characterMinDef.toInt(),
-                        characterMaxDef = characterMaxDef.toInt(),
-                        characterMinSpeed = characterMinSpeed.toInt(),
-                        characterMaxSpeed = characterMaxSpeed.toInt()
+                        rules = generationRules
                     )
                     onGenerate(config, title)
                 },
@@ -317,30 +281,6 @@ private fun GeneratorScreenContent(
                                 selected = selectedTheme == theme,
                                 onClick = { selectedTheme = theme },
                                 label = { Text(getThemeName(theme)) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("命名风格", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        RandomStoryGenerator.NamingStyle.entries.forEach { style ->
-                            FilterChip(
-                                selected = selectedNamingStyle == style,
-                                onClick = { selectedNamingStyle = style },
-                                label = { 
-                                    Text(when(style) {
-                                        RandomStoryGenerator.NamingStyle.AUTO -> "自动"
-                                        RandomStoryGenerator.NamingStyle.CHINESE -> "中文"
-                                        RandomStoryGenerator.NamingStyle.WESTERN -> "西方"
-                                    })
-                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -464,281 +404,16 @@ private fun GeneratorScreenContent(
                 }
             }
             
-            // Custom Stats Config
-            CustomStatConfigEditor(
-                configs = customStatConfigs,
-                onConfigsChange = { customStatConfigs = it }
+
+            
+
+            
+            // Generation Rules List
+            GenerationRuleListEditor(
+                rules = generationRules,
+                allTemplates = allTemplates,
+                onRulesChange = { generationRules = it }
             )
-            
-            // Enemy Base Stats Config
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("敌人基础属性 (Base Stats)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    
-                    SliderControl("生命值 (HP)", "${enemyMinHp.toInt()} - ${enemyMaxHp.toInt()}") {
-                        RangeSlider(
-                            value = enemyMinHp..enemyMaxHp,
-                            onValueChange = { 
-                                enemyMinHp = it.start
-                                enemyMaxHp = it.endInclusive
-                            },
-                            valueRange = 1f..1000f,
-                            steps = 0
-                        )
-                    }
-                    
-                    SliderControl("攻击力 (ATK)", "${enemyMinAtk.toInt()} - ${enemyMaxAtk.toInt()}") {
-                        RangeSlider(
-                            value = enemyMinAtk..enemyMaxAtk,
-                            onValueChange = { 
-                                enemyMinAtk = it.start
-                                enemyMaxAtk = it.endInclusive
-                            },
-                            valueRange = 1f..200f,
-                            steps = 0
-                        )
-                    }
-                    
-                    SliderControl("防御力 (DEF)", "${enemyMinDef.toInt()} - ${enemyMaxDef.toInt()}") {
-                        RangeSlider(
-                            value = enemyMinDef..enemyMaxDef,
-                            onValueChange = { 
-                                enemyMinDef = it.start
-                                enemyMaxDef = it.endInclusive
-                            },
-                            valueRange = 0f..100f,
-                            steps = 0
-                        )
-                    }
-                     
-                    SliderControl("速度 (SPD)", "${enemyMinSpeed.toInt()} - ${enemyMaxSpeed.toInt()}") {
-                        RangeSlider(
-                            value = enemyMinSpeed..enemyMaxSpeed,
-                            onValueChange = { 
-                                enemyMinSpeed = it.start
-                                enemyMaxSpeed = it.endInclusive
-                            },
-                            valueRange = 1f..100f,
-                            steps = 0
-                        )
-                    }
-                }
-            }
-
-            // Character Base Stats Config
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("角色基础属性 (Base Stats)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    
-                    SliderControl("生命值 (HP)", "${characterMinHp.toInt()} - ${characterMaxHp.toInt()}") {
-                        RangeSlider(
-                            value = characterMinHp..characterMaxHp,
-                            onValueChange = { 
-                                characterMinHp = it.start
-                                characterMaxHp = it.endInclusive
-                            },
-                            valueRange = 1f..1000f,
-                            steps = 0
-                        )
-                    }
-                    
-                    SliderControl("攻击力 (ATK)", "${characterMinAtk.toInt()} - ${characterMaxAtk.toInt()}") {
-                        RangeSlider(
-                            value = characterMinAtk..characterMaxAtk,
-                            onValueChange = { 
-                                characterMinAtk = it.start
-                                characterMaxAtk = it.endInclusive
-                            },
-                            valueRange = 1f..200f,
-                            steps = 0
-                        )
-                    }
-                    
-                    SliderControl("防御力 (DEF)", "${characterMinDef.toInt()} - ${characterMaxDef.toInt()}") {
-                        RangeSlider(
-                            value = characterMinDef..characterMaxDef,
-                            onValueChange = { 
-                                characterMinDef = it.start
-                                characterMaxDef = it.endInclusive
-                            },
-                            valueRange = 0f..100f,
-                            steps = 0
-                        )
-                    }
-                     
-                    SliderControl("速度 (SPD)", "${characterMinSpeed.toInt()} - ${characterMaxSpeed.toInt()}") {
-                        RangeSlider(
-                            value = characterMinSpeed..characterMaxSpeed,
-                            onValueChange = { 
-                                characterMinSpeed = it.start
-                                characterMaxSpeed = it.endInclusive
-                            },
-                            valueRange = 1f..100f,
-                            steps = 0
-                        )
-                    }
-                }
-            }
-            
-            // Core Elements Generation
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("核心元素生成", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    
-                    SliderControl("随机道具模板", "${minItems.toInt()} - ${maxItems.toInt()}") {
-                        RangeSlider(
-                            value = minItems..maxItems,
-                            onValueChange = { 
-                                minItems = it.start
-                                maxItems = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-                    
-                    SliderControl("随机变量", "${minVariables.toInt()} - ${maxVariables.toInt()}") {
-                        RangeSlider(
-                            value = minVariables..maxVariables,
-                            onValueChange = { 
-                                minVariables = it.start
-                                maxVariables = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-                    
-                    SliderControl("随机敌人模板", "${minEnemies.toInt()} - ${maxEnemies.toInt()}") {
-                        RangeSlider(
-                            value = minEnemies..maxEnemies,
-                            onValueChange = { 
-                                minEnemies = it.start
-                                maxEnemies = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-                    
-                    SliderControl("随机角色数量", "${minCharacters.toInt()} - ${maxCharacters.toInt()}") {
-                        RangeSlider(
-                            value = minCharacters..maxCharacters,
-                            onValueChange = { 
-                                minCharacters = it.start
-                                maxCharacters = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-
-                    SliderControl("随机地点数量", "${minLocations.toInt()} - ${maxLocations.toInt()}") {
-                        RangeSlider(
-                            value = minLocations..maxLocations,
-                            onValueChange = { 
-                                minLocations = it.start
-                                maxLocations = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-
-                    SliderControl("随机事件数量", "${minEvents.toInt()} - ${maxEvents.toInt()}") {
-                        RangeSlider(
-                            value = minEvents..maxEvents,
-                            onValueChange = { 
-                                minEvents = it.start
-                                maxEvents = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-
-                    SliderControl("随机线索数量", "${minClues.toInt()} - ${maxClues.toInt()}") {
-                        RangeSlider(
-                            value = minClues..maxClues,
-                            onValueChange = { 
-                                minClues = it.start
-                                maxClues = it.endInclusive
-                            },
-                            valueRange = 0f..20f,
-                            steps = 19
-                        )
-                    }
-
-                    SliderControl("随机阵营数量", "${minFactions.toInt()} - ${maxFactions.toInt()}") {
-                        RangeSlider(
-                            value = minFactions..maxFactions,
-                            onValueChange = { 
-                                minFactions = it.start
-                                maxFactions = it.endInclusive
-                            },
-                            valueRange = 0f..10f,
-                            steps = 9
-                        )
-                    }
-                    
-                    if (allTemplates.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider()
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text("名称模板选择", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        
-                        Text("道具生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedItemTemplate,
-                            onSelectionChange = { selectedItemTemplate = it }
-                        )
-
-                        Text("敌人生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedEnemyTemplate,
-                            onSelectionChange = { selectedEnemyTemplate = it }
-                        )
-                        
-                        Text("角色生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedCharacterTemplate,
-                            onSelectionChange = { selectedCharacterTemplate = it }
-                        )
-                        
-                        Text("地点生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedLocationTemplate,
-                            onSelectionChange = { selectedLocationTemplate = it }
-                        )
-                        
-                        Text("事件生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedEventTemplate,
-                            onSelectionChange = { selectedEventTemplate = it }
-                        )
-                        
-                        Text("线索生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedClueTemplate,
-                            onSelectionChange = { selectedClueTemplate = it }
-                        )
-                        
-                        Text("阵营生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        SingleTemplateSelector(
-                            templates = allTemplates,
-                            selectedId = selectedFactionTemplate,
-                            onSelectionChange = { selectedFactionTemplate = it }
-                        )
-                    }
-                }
-            }
             
             // Seed
              Card(modifier = Modifier.fillMaxWidth()) {
@@ -804,6 +479,320 @@ private fun ProbabilityControl(
     }
 }
 
+@Composable
+fun GenerationRuleListEditor(
+    rules: List<RandomStoryGenerator.GenerationRule>,
+    allTemplates: List<com.novelsim.app.data.source.NameTemplate>,
+    onRulesChange: (List<RandomStoryGenerator.GenerationRule>) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("生成规则", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (rules.isEmpty()) {
+                Text(
+                    text = "暂无生成规则，点击下方按钮添加",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    rules.forEachIndexed { index, rule ->
+                        GenerationRuleEditor(
+                            rule = rule,
+                            allTemplates = allTemplates,
+                            onUpdate = { updatedRule ->
+                                val newRules = rules.toMutableList()
+                                newRules[index] = updatedRule
+                                onRulesChange(newRules)
+                            },
+                            onDelete = {
+                                val newRules = rules.toMutableList()
+                                newRules.removeAt(index)
+                                onRulesChange(newRules)
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Full-width Add Rule Button at the bottom
+            OutlinedButton(
+                onClick = {
+                    val newRules = rules + RandomStoryGenerator.GenerationRule(RandomStoryGenerator.EntityType.CHARACTER)
+                    onRulesChange(newRules)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("规则", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+@Composable
+fun GenerationRuleEditor(
+    rule: RandomStoryGenerator.GenerationRule,
+    allTemplates: List<com.novelsim.app.data.source.NameTemplate>,
+    onUpdate: (RandomStoryGenerator.GenerationRule) -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        border = null
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Row 1: Type, Count, Delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Type Selector
+                var typeExpanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.weight(1.5f)) {
+                    OutlinedButton(
+                        onClick = { typeExpanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(getEntityTypeLabel(rule.type))
+                        Spacer(modifier = Modifier.weight(1f))
+                        Icon(Icons.Default.ArrowDropDown, null)
+                    }
+                    DropdownMenu(
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false }
+                    ) {
+                        RandomStoryGenerator.EntityType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(getEntityTypeLabel(type)) },
+                                onClick = { 
+                                    onUpdate(rule.copy(type = type))
+                                    typeExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                // Count Input
+                IntTextField(
+                    value = rule.count,
+                    onValueChange = { onUpdate(rule.copy(count = it)) },
+                    label = "数量",
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Delete Button
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete, 
+                        contentDescription = "删除", 
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Row 2: Template Selector
+            SingleTemplateSelector(
+                templates = allTemplates,
+                selectedId = rule.templateId,
+                onSelectionChange = { onUpdate(rule.copy(templateId = it)) }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Row 3: Custom Attributes
+            var showAttributes by remember { mutableStateOf(false) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showAttributes = !showAttributes }
+                    .padding(vertical = 4.dp)
+            ) {
+                Icon(
+                    if (showAttributes) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "自定义属性 (${rule.customStats.size})",
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+            
+            if (showAttributes) {
+                Spacer(modifier = Modifier.height(8.dp))
+                CustomStatConfigEditor(
+                    configs = rule.customStats,
+                    onConfigsChange = { onUpdate(rule.copy(customStats = it)) }
+                )
+            }
+
+            // Row 4: Basic Stats (Characters & Enemies only)
+            if (rule.type == RandomStoryGenerator.EntityType.CHARACTER || rule.type == RandomStoryGenerator.EntityType.ENEMY) {
+                Spacer(modifier = Modifier.height(8.dp))
+                var showBasicStats by remember { mutableStateOf(false) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showBasicStats = !showBasicStats }
+                        .padding(vertical = 4.dp)
+                ) {
+                    Icon(
+                        if (showBasicStats) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "基础属性 (HP/攻/防/速)",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+
+                if (showBasicStats) {
+                     val basicStats = rule.basicStats ?: RandomStoryGenerator.BasicStatsConfig()
+                     BasicStatsEditor(
+                         config = basicStats,
+                         onConfigChange = { onUpdate(rule.copy(basicStats = it)) },
+                         enabled = true // Always enabled if expanded, or add a toggle if needed. Currently assuming expanded means enabled.
+                         // Actually, if rule.basicStats is null, we use default.
+                         // But to "enable" custom basic stats, we might want a checkbox?
+                         // For now, let's just show values. If user modifies them, we save them.
+                         // If user wants "default", maybe they can clear it?
+                         // Simpler: Just showing the editor updates the values.
+                     )
+                }
+            }
+        }
+    }
+}
+
+
+
+/**
+ * A text field for integer input that handles empty state gracefully.
+ * Allow empty string to represent 0 or "no input" visually, but reports 0 to callback if empty.
+ */
+@Composable
+fun IntTextField(
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    var text by remember { mutableStateOf(value.toString()) }
+    
+    // Sync with external value changes (e.g. reset or presets)
+    LaunchedEffect(value) {
+        // Only potential conflict is if user cleared text (text="") and value is 0.
+        // We generally shouldn't overwrite user's empty input with "0" immediately.
+        if (text.isEmpty() && value == 0) return@LaunchedEffect
+        
+        if (text.toIntOrNull() != value) {
+            text = value.toString()
+        }
+    }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { newText ->
+            // Only allow numeric input (and empty)
+            if (newText.isEmpty() || newText.all { it.isDigit() }) {
+                text = newText
+                onValueChange(newText.toIntOrNull() ?: 0)
+            }
+        },
+        modifier = modifier,
+        label = { Text(label) },
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodySmall,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+    )
+}
+
+@Composable
+fun BasicStatsEditor(
+    config: RandomStoryGenerator.BasicStatsConfig,
+    onConfigChange: (RandomStoryGenerator.BasicStatsConfig) -> Unit,
+    enabled: Boolean = true
+) {
+    Column(modifier = Modifier.padding(start = 8.dp)) {
+        // Helper for Min-Max Row
+        @Composable
+        fun StatRow(label: String, min: Int, max: Int, onMinChange: (Int) -> Unit, onMaxChange: (Int) -> Unit) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+            ) {
+                Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(40.dp))
+                IntTextField(
+                    value = min,
+                    onValueChange = onMinChange,
+                    label = "Min",
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("-", style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.width(4.dp))
+                IntTextField(
+                    value = max,
+                    onValueChange = onMaxChange,
+                    label = "Max",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        StatRow("HP", config.hpMin, config.hpMax, 
+            { onConfigChange(config.copy(hpMin = it)) }, 
+            { onConfigChange(config.copy(hpMax = it)) }
+        )
+        StatRow("ATK", config.atkMin, config.atkMax, 
+            { onConfigChange(config.copy(atkMin = it)) }, 
+            { onConfigChange(config.copy(atkMax = it)) }
+        )
+        StatRow("DEF", config.defMin, config.defMax, 
+            { onConfigChange(config.copy(defMin = it)) }, 
+            { onConfigChange(config.copy(defMax = it)) }
+        )
+        StatRow("SPD", config.spdMin, config.spdMax, 
+            { onConfigChange(config.copy(spdMin = it)) }, 
+            { onConfigChange(config.copy(spdMax = it)) }
+        )
+    }
+}
+
+private fun getEntityTypeLabel(type: RandomStoryGenerator.EntityType): String {
+    return when(type) {
+        RandomStoryGenerator.EntityType.CHARACTER -> "角色"
+        RandomStoryGenerator.EntityType.ENEMY -> "敌人"
+        RandomStoryGenerator.EntityType.ITEM -> "道具"
+        RandomStoryGenerator.EntityType.LOCATION -> "地点"
+        RandomStoryGenerator.EntityType.FACTION -> "阵营"
+        RandomStoryGenerator.EntityType.EVENT -> "事件"
+        RandomStoryGenerator.EntityType.CLUE -> "线索"
+        RandomStoryGenerator.EntityType.VARIABLE -> "变量"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SingleTemplateSelector(
@@ -853,3 +842,5 @@ private fun getThemeName(theme: RandomStoryGenerator.StoryTheme): String = when 
     RandomStoryGenerator.StoryTheme.ROMANCE -> "言情"
     RandomStoryGenerator.StoryTheme.HORROR -> "恐怖"
 }
+
+

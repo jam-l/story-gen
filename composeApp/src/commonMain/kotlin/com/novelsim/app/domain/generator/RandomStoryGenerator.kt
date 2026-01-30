@@ -48,38 +48,6 @@ class RandomStoryGenerator(
         val minEndings: Int = 1,
         val maxEndings: Int = 3,
         
-        /** 随机生成道具数量 (Item Templates) */
-        val minRandomItems: Int = 2,
-        val maxRandomItems: Int = 5,
-        
-        /** 随机生成变量数量 */
-        val minRandomVariables: Int = 2,
-        val maxRandomVariables: Int = 5,
-        
-        /** 随机生成敌人数量 */
-        val minRandomEnemies: Int = 2,
-        val maxRandomEnemies: Int = 5,
-
-        /** 随机生成角色数量 */
-        val minRandomCharacters: Int = 3,
-        val maxRandomCharacters: Int = 6,
-
-        /** 随机生成地点数量 */
-        val minRandomLocations: Int = 3,
-        val maxRandomLocations: Int = 6,
-
-        /** 随机生成事件数量 */
-        val minRandomEvents: Int = 2,
-        val maxRandomEvents: Int = 4,
-
-        /** 随机生成线索数量 */
-        val minRandomClues: Int = 2,
-        val maxRandomClues: Int = 5,
-
-        /** 随机生成阵营数量 */
-        val minRandomFactions: Int = 2,
-        val maxRandomFactions: Int = 4,
-        
         /** 故事主题 */
         val theme: StoryTheme = StoryTheme.FANTASY,
         
@@ -93,38 +61,15 @@ class RandomStoryGenerator(
         val generateEnding: Boolean = true,
         
         /** 随机种子（null 表示随机） */
-        /** 随机种子（null 表示随机） */
         val seed: Long? = null,
         
         /** 命名风格 */
         val namingStyle: NamingStyle = NamingStyle.AUTO,
         
-        /** 选用的道具命名模板 ID 列表 */
-        val itemTemplateIds: List<String> = emptyList(),
-        
-        /** 选用的敌人命名模板 ID 列表 */
-        /** 选用的敌人命名模板 ID 列表 */
-        val enemyTemplateIds: List<String> = emptyList(),
+        /** 生成规则列表 */
+        val rules: List<GenerationRule> = emptyList(),
 
-        /** 选用的角色命名模板 ID 列表 */
-        val characterTemplateIds: List<String> = emptyList(),
-
-        /** 选用的地点命名模板 ID 列表 */
-        val locationTemplateIds: List<String> = emptyList(),
-
-        /** 选用的事件命名模板 ID 列表 */
-        val eventTemplateIds: List<String> = emptyList(),
-        
-        /** 选用的线索命名模板 ID 列表 */
-        val clueTemplateIds: List<String> = emptyList(),
-
-        /** 选用的阵营命名模板 ID 列表 */
-        val factionTemplateIds: List<String> = emptyList(),
-        
-        /** 自定义属性生成配置 */
-        val customStats: List<CustomStatConfig> = emptyList(),
-
-        /** 敌人属性配置范围 */
+        /** 敌人属性配置范围 (默认值，可被规则覆盖或作为兜底) */
         val enemyMinHp: Int = 50,
         val enemyMaxHp: Int = 200,
         val enemyMinAtk: Int = 5,
@@ -134,7 +79,7 @@ class RandomStoryGenerator(
         val enemyMinSpeed: Int = 5,
         val enemyMaxSpeed: Int = 15,
 
-        /** 角色属性配置范围 */
+        /** 角色属性配置范围 (默认值，可被规则覆盖或作为兜底) */
         val characterMinHp: Int = 80,
         val characterMaxHp: Int = 150,
         val characterMinAtk: Int = 10,
@@ -143,6 +88,17 @@ class RandomStoryGenerator(
         val characterMaxDef: Int = 15,
         val characterMinSpeed: Int = 8,
         val characterMaxSpeed: Int = 18
+    )
+
+    /**
+     * 实体生成规则
+     */
+    data class GenerationRule(
+        val type: EntityType,
+        val templateId: String? = null,
+        val count: Int = 1,
+        val customStats: List<CustomStatConfig> = emptyList(),
+        val basicStats: BasicStatsConfig? = null
     )
 
     /**
@@ -155,7 +111,8 @@ class RandomStoryGenerator(
         LOCATION,
         FACTION,
         EVENT,
-        CLUE
+        CLUE,
+        VARIABLE
     }
 
     /**
@@ -166,6 +123,20 @@ class RandomStoryGenerator(
         val min: Int,
         val max: Int,
         val applyTo: Set<EntityType> = setOf(EntityType.CHARACTER, EntityType.ENEMY)
+    )
+
+    /**
+     * 基础属性配置
+     */
+    data class BasicStatsConfig(
+        val hpMin: Int = 50,
+        val hpMax: Int = 100,
+        val atkMin: Int = 5,
+        val atkMax: Int = 20,
+        val defMin: Int = 0,
+        val defMax: Int = 10,
+        val spdMin: Int = 5,
+        val spdMax: Int = 15
     )
     
     /**
@@ -364,9 +335,6 @@ class RandomStoryGenerator(
     /**
      * 生成随机故事
      */
-    /**
-     * 生成随机故事
-     */
     suspend fun generate(title: String = "随机生成的故事"): Story {
         val nodeCount = random.nextInt(config.minNodes, config.maxNodes + 1)
         val choiceCount = random.nextInt(config.minChoices, config.maxChoices + 1)
@@ -480,62 +448,52 @@ class RandomStoryGenerator(
     }
 
     private suspend fun generateRandomItems(): List<Item> {
-        val count = random.nextInt(config.minRandomItems, config.maxRandomItems + 1)
         val items = mutableListOf<Item>()
         
-        // Use user selected templates
-        val selectedIds = config.itemTemplateIds
-        
-        // Fallback types if no templates
-        val defaultTypes = listOf(ItemType.CONSUMABLE, ItemType.EQUIPMENT, ItemType.MATERIAL, ItemType.KEY_ITEM)
-        
-        for (i in 0 until count) {
-            val id = "item_${PlatformUtils.getCurrentTimeMillis()}_$i"
-            var name = "随机道具 $i"
-            var type = defaultTypes.random(random)
-            var description = "这是一个随机生成的物品"
-            
-            if (selectedIds.isNotEmpty()) {
-                val templateId = selectedIds.random(random)
-                name = nameProvider?.generate(templateId) ?: name
+        config.rules.filter { it.type == EntityType.ITEM }.forEach { rule ->
+            for (i in 0 until rule.count) {
+                val id = "item_${PlatformUtils.getCurrentTimeMillis()}_${items.size}"
+                var name = "随机道具 $i"
+                var type = ItemType.CONSUMABLE // Default type
+                var description = "这是一个随机生成的物品"
                 
-                // Infer type from template ID (simple heuristic for consistency)
-                type = when {
-                    templateId.contains("equipment") || templateId.contains("sword") || templateId.contains("blade") -> ItemType.EQUIPMENT
-                    templateId.contains("treasure") -> ItemType.MATERIAL
-                    templateId.contains("key") -> ItemType.KEY_ITEM
-                    else -> defaultTypes.random(random)
+                if (rule.templateId != null) {
+                    name = nameProvider?.generate(rule.templateId) ?: name
+                    type = when {
+                        rule.templateId.contains("equipment") || rule.templateId.contains("sword") || rule.templateId.contains("blade") || rule.templateId.contains("weapon") -> ItemType.EQUIPMENT
+                        rule.templateId.contains("treasure") -> ItemType.MATERIAL
+                        rule.templateId.contains("key") -> ItemType.KEY_ITEM
+                        rule.templateId.contains("potion") || rule.templateId.contains("food") -> ItemType.CONSUMABLE
+                        else -> ItemType.CONSUMABLE // Fallback
+                    }
+                } else {
+                    // Fallback to random type if no template ID
+                    type = listOf(ItemType.CONSUMABLE, ItemType.EQUIPMENT, ItemType.MATERIAL, ItemType.KEY_ITEM).random(random)
                 }
                 
-                // We don't have description in template directly unless we fetch it back, but nameProvider.generate returns String.
-                // We can't easy get description here without fetching template object.
-                // But user just wants name.
-            }
-            
-            // 生成自定义属性
-            val variables = mutableMapOf<String, String>()
-            config.customStats.filter { it.applyTo.contains(EntityType.ITEM) }.forEach { statConfig ->
-                variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-            }
+                // 生成自定义属性
+                val variables = mutableMapOf<String, String>()
+                rule.customStats.forEach { statConfig ->
+                    variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                }
 
-            items.add(
-                Item(
-                    id = id,
-                    name = name,
-                    description = description,
-                    type = type,
-                    // removed rarity
-                    icon = null, // 无图标
-                    price = random.nextInt(10, 500),
-                    variables = variables
+                items.add(
+                    Item(
+                        id = id,
+                        name = name,
+                        description = description,
+                        type = type,
+                        icon = null,
+                        price = random.nextInt(10, 500),
+                        variables = variables
+                    )
                 )
-            )
+            }
         }
         return items
     }
 
     private suspend fun generateRandomVariables(): Map<String, String> {
-        val count = random.nextInt(config.minRandomVariables, config.maxRandomVariables + 1)
         val variables = mutableMapOf<String, String>()
         val commonVars = listOf("honor", "karma", "sanity", "mana", "stamina", "charm")
         
@@ -543,271 +501,291 @@ class RandomStoryGenerator(
         variables["gold"] = "0"
         variables["exp"] = "0"
         variables["level"] = "1"
-        
-        for (i in 0 until count) {
-             var name = "var_${random.nextInt(1000)}"
-             
-             if (nameProvider != null) {
-                 // 尝试使用 NameProvider 生成
-                 val randomName = nameProvider.getVariableName()
-                 if (!randomName.startsWith("未知模板")) {
-                     name = randomName
+
+        config.rules.filter { it.type == EntityType.VARIABLE }.forEach { rule ->
+             for (i in 0 until rule.count) {
+                 var name = "var_${random.nextInt(1000)}"
+                 
+                 if (rule.templateId != null && nameProvider != null) {
+                     val randomName = nameProvider.generate(rule.templateId)
+                      if (!randomName.startsWith("未知模板")) {
+                         name = randomName
+                      }
                  } else {
-                     // Fallback to common vars if template missing
+                     // Fallback to common vars or generic name
                      if (i < commonVars.size && random.nextBoolean()) {
-                         name = commonVars[i] + "_$i"
+                          name = commonVars[i]
+                     } else {
+                         name = "random_var_${random.nextInt(1000)}"
                      }
                  }
-             } else {
-                 if (i < commonVars.size && random.nextBoolean()) {
-                     name = commonVars[i] + "_$i"
+                 
+                 // Ensure unique name if generated randomly
+                 var uniqueName = name
+                 var counter = 0
+                 while (variables.containsKey(uniqueName)) {
+                     uniqueName = "${name}_${counter++}"
                  }
+                 
+                 // Default value for randomly generated variables
+                 variables[uniqueName] = if (random.nextBoolean()) "0" else random.nextInt(100).toString()
              }
              
-             // 确保变量名唯一 (简单处理，追加后缀)
-             if (variables.containsKey(name)) {
-                 name = "${name}_$i"
+             // Add variables defined by customStats within the rule
+             rule.customStats.forEach { stat ->
+                 variables[stat.name] = random.nextInt(stat.min, stat.max + 1).toString()
              }
-             
-             variables[name] = if (random.nextBoolean()) "0" else random.nextInt(100).toString()
         }
+        
         return variables
     }
 
     private suspend fun generateRandomEnemies(): List<Enemy> {
-        val count = random.nextInt(config.minRandomEnemies, config.maxRandomEnemies + 1)
         val enemies = mutableListOf<Enemy>()
         
-        // Use user selected templates
-        val selectedIds = config.enemyTemplateIds
-        
-        for (i in 0 until count) {
-            val id = "enemy_${PlatformUtils.getCurrentTimeMillis()}_$i"
-            
-            var name = "随机怪物" // default
-            var description = "一只危险的生物"
-            
-            if (selectedIds.isNotEmpty()) {
-                val templateId = selectedIds.random(random)
-                name = nameProvider?.generate(templateId) ?: name
-            } else {
-                 val fallbackTemplates = listOf("slime", "goblin", "wolf", "orc", "ghost")
-                 name = fallbackTemplates.random(random)
-            }
-            
-            val stats = CharacterStats(
-                maxHp = random.nextInt(config.enemyMinHp, config.enemyMaxHp + 1),
-                currentHp = random.nextInt(config.enemyMinHp, config.enemyMaxHp + 1), // start with full HP or random? usually max. let's keep it random max for now as per previous code, but ensure current <= max
-                // previous code: currentHp = random.nextInt(50, 200), maxHp = random.nextInt(50, 200). 
-                // This implies current and max are independent and current could be > max if we are unlucky? 
-                // Wait, random.nextInt(min, max). 
-                // Actually usually we want currentHp = maxHp.
-                // Let's generate maxHp first.
-            )
-            val maxHp = random.nextInt(config.enemyMinHp, config.enemyMaxHp + 1)
-            stats.maxHp = maxHp
-            stats.currentHp = maxHp // Full health by default
-            stats.attack = random.nextInt(config.enemyMinAtk, config.enemyMaxAtk + 1)
-            stats.defense = random.nextInt(config.enemyMinDef, config.enemyMaxDef + 1)
-            stats.speed = random.nextInt(config.enemyMinSpeed, config.enemyMaxSpeed + 1)
-            
-            // 生成自定义属性
-            val variables = mutableMapOf<String, String>()
-            config.customStats.filter { it.applyTo.contains(EntityType.ENEMY) }.forEach { statConfig ->
-                variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-            }
-            
-            enemies.add(
-                 Enemy(
-                    id = id,
-                    name = name,
-                    description = description,
-                    stats = stats,
-                    expReward = random.nextInt(10, 50),
-                    goldReward = random.nextInt(5, 20),
-                    variables = variables
+        config.rules.filter { it.type == EntityType.ENEMY }.forEach { rule ->
+            for (i in 0 until rule.count) {
+                val id = "enemy_${PlatformUtils.getCurrentTimeMillis()}_${enemies.size}"
+                var name = "随机怪物"
+                var description = "一只危险的生物"
+                
+                if (rule.templateId != null) {
+                    name = nameProvider?.generate(rule.templateId) ?: name
+                } else {
+                     val fallbackTemplates = listOf("slime", "goblin", "wolf", "orc", "ghost")
+                     name = fallbackTemplates.random(random)
+                }
+                               // 生成基础属性
+                 val stats = if (rule.basicStats != null) {
+                     CharacterStats(
+                         maxHp = random.nextInt(rule.basicStats.hpMin, rule.basicStats.hpMax + 1),
+                         currentHp = 0,
+                         attack = random.nextInt(rule.basicStats.atkMin, rule.basicStats.atkMax + 1),
+                         defense = random.nextInt(rule.basicStats.defMin, rule.basicStats.defMax + 1),
+                         speed = random.nextInt(rule.basicStats.spdMin, rule.basicStats.spdMax + 1),
+                         exp = random.nextInt(5, 20)
+                     ).apply { currentHp = maxHp }
+                 } else {
+                     CharacterStats(
+                         maxHp = random.nextInt(config.enemyMinHp, config.enemyMaxHp + 1),
+                         currentHp = 0,
+                         attack = random.nextInt(config.enemyMinAtk, config.enemyMaxAtk + 1),
+                         defense = random.nextInt(config.enemyMinDef, config.enemyMaxDef + 1),
+                         speed = random.nextInt(config.enemyMinSpeed, config.enemyMaxSpeed + 1),
+                         exp = random.nextInt(5, 20)
+                     ).apply { currentHp = maxHp }
+                 }
+                
+                // 生成自定义属性
+                val variables = mutableMapOf<String, String>()
+                rule.customStats.forEach { statConfig ->
+                    variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                }
+                
+                enemies.add(
+                     Enemy(
+                        id = id,
+                        name = name,
+                        description = description,
+                        stats = stats,
+                        expReward = random.nextInt(10, 50),
+                        goldReward = random.nextInt(5, 20),
+                        variables = variables
+                    )
                 )
-            )
+            }
         }
         return enemies
     }
 
     private suspend fun generateRandomCharacters(): List<Character> {
-        val count = random.nextInt(config.minRandomCharacters, config.maxRandomCharacters + 1)
         val characters = mutableListOf<Character>()
         
-        for (i in 0 until count) {
-            var name = "角色 $i"
-            if (nameProvider != null) {
-                // Use configured template if available
-                if (config.characterTemplateIds.isNotEmpty()) {
-                    name = nameProvider.generate(config.characterTemplateIds.random(random))
-                } else {
-                    val useChinese = when (config.namingStyle) {
-                        NamingStyle.CHINESE -> true
-                        NamingStyle.WESTERN -> false
-                        NamingStyle.AUTO -> when(config.theme) {
-                            StoryTheme.FANTASY, StoryTheme.MYSTERY, StoryTheme.ROMANCE -> true
-                            else -> false
+        config.rules.filter { it.type == EntityType.CHARACTER }.forEach { rule ->
+            for (i in 0 until rule.count) {
+                var name = "角色 $i"
+                if (nameProvider != null) {
+                    if (rule.templateId != null) {
+                        name = nameProvider.generate(rule.templateId)
+                    } else {
+                        val useChinese = when (config.namingStyle) {
+                            NamingStyle.CHINESE -> true
+                            NamingStyle.WESTERN -> false
+                            NamingStyle.AUTO -> when(config.theme) {
+                                StoryTheme.FANTASY, StoryTheme.MYSTERY, StoryTheme.ROMANCE -> true
+                                else -> false
+                            }
                         }
+                        name = if (useChinese) nameProvider.getChineseName() else nameProvider.getEnglishName()
                     }
-                    name = if (useChinese) nameProvider.getChineseName() else nameProvider.getEnglishName()
                 }
+                               // 生成基础属性
+                 val stats = if (rule.basicStats != null) {
+                     CharacterStats(
+                         maxHp = random.nextInt(rule.basicStats.hpMin, rule.basicStats.hpMax + 1),
+                         currentHp = 0, // 会在初始化时被设为maxHp
+                         attack = random.nextInt(rule.basicStats.atkMin, rule.basicStats.atkMax + 1),
+                         defense = random.nextInt(rule.basicStats.defMin, rule.basicStats.defMax + 1),
+                         speed = random.nextInt(rule.basicStats.spdMin, rule.basicStats.spdMax + 1),
+                         exp = 0
+                     ).apply { currentHp = maxHp }
+                 } else {
+                     CharacterStats(
+                         maxHp = random.nextInt(config.characterMinHp, config.characterMaxHp + 1),
+                         currentHp = 0,
+                         attack = random.nextInt(config.characterMinAtk, config.characterMaxAtk + 1),
+                         defense = random.nextInt(config.characterMinDef, config.characterMaxDef + 1),
+                         speed = random.nextInt(config.characterMinSpeed, config.characterMaxSpeed + 1),
+                         exp = 0
+                     ).apply { currentHp = maxHp }
+                 }
+                
+                // 生成自定义属性
+                val variables = mutableMapOf<String, String>()
+                rule.customStats.forEach { statConfig ->
+                    variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                }
+                
+                characters.add(Character(
+                    id = "char_${PlatformUtils.getCurrentTimeMillis()}_${characters.size}",
+                    name = name,
+                    description = "这是一个随机生成的角色",
+                    baseStats = stats,
+                    variables = variables
+                ))
             }
-            
-            val stats = CharacterStats(
-                 maxHp = random.nextInt(config.characterMinHp, config.characterMaxHp + 1),
-                 currentHp = random.nextInt(config.characterMinHp, config.characterMaxHp + 1),
-                 attack = random.nextInt(config.characterMinAtk, config.characterMaxAtk + 1),
-                 defense = random.nextInt(config.characterMinDef, config.characterMaxDef + 1),
-                 speed = random.nextInt(config.characterMinSpeed, config.characterMaxSpeed + 1)
-            )
-            // Ensure currentHp is consistent (usually equal to maxHp or at least <= maxHp)
-            stats.currentHp = stats.maxHp
-            
-            // 生成自定义属性
-            val variables = mutableMapOf<String, String>()
-            config.customStats.filter { it.applyTo.contains(EntityType.CHARACTER) }.forEach { statConfig ->
-                variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-            }
-            
-            characters.add(Character(
-                id = "char_${PlatformUtils.getCurrentTimeMillis()}_$i",
-                name = name,
-                description = "这是一个随机生成的角色",
-                baseStats = stats,
-                variables = variables
-            ))
         }
         return characters
     }
     
     private suspend fun generateRandomLocations(): List<Location> {
-        val count = random.nextInt(config.minRandomLocations, config.maxRandomLocations + 1)
         val locations = mutableListOf<Location>()
         
-        for (i in 0 until count) {
-            var name = "地点 $i"
-            if (nameProvider != null) {
-                 if (config.locationTemplateIds.isNotEmpty()) {
-                     name = nameProvider.generate(config.locationTemplateIds.random(random))
-                 } else {
-                     // Try to use place_name template if available
-                     name = nameProvider.generate("place_name")
-                     if (name.startsWith("未知模板")) name = "神秘地点 $i"
-                 }
+        config.rules.filter { it.type == EntityType.LOCATION }.forEach { rule ->
+             for (i in 0 until rule.count) {
+                var name = "地点 $i"
+                if (nameProvider != null) {
+                     if (rule.templateId != null) {
+                         name = nameProvider.generate(rule.templateId)
+                     } else {
+                         name = nameProvider.generate("place_name")
+                         if (name.startsWith("未知模板")) name = "神秘地点 $i"
+                     }
+                }
+                
+                // 生成自定义属性
+                val variables = mutableMapOf<String, String>()
+                rule.customStats.forEach { statConfig ->
+                    variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                }
+    
+                locations.add(Location(
+                    id = "loc_${PlatformUtils.getCurrentTimeMillis()}_${locations.size}",
+                    name = name,
+                    description = "这是一个随机生成的地点",
+                    variables = variables
+                ))
             }
-            
-            // 生成自定义属性
-            val variables = mutableMapOf<String, String>()
-            config.customStats.filter { it.applyTo.contains(EntityType.LOCATION) }.forEach { statConfig ->
-                variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-            }
-
-            locations.add(Location(
-                id = "loc_${PlatformUtils.getCurrentTimeMillis()}_$i",
-                name = name,
-                description = "这是一个随机生成的地点",
-                variables = variables
-            ))
         }
         return locations
     }
     
     private suspend fun generateRandomFactions(): List<Faction> {
-        val count = random.nextInt(config.minRandomFactions, config.maxRandomFactions + 1)
         val factions = mutableListOf<Faction>()
         
-        for (i in 0 until count) {
-             var name = "阵营 $i"
-             // Use martial arts prefix as faction name if possible?
-             // Or just place name + "派"
-             if (nameProvider != null) {
-                  if (config.factionTemplateIds.isNotEmpty()) {
-                      name = nameProvider.generate(config.factionTemplateIds.random(random))
-                  } else {
-                      // Hack: generate skill name and take prefix if possible, or just use place name
-                      val place = nameProvider.generate("place_name")
-                      name = if (!place.startsWith("未知模板")) "$place 派" else "阵营 $i"
-                  }
-             }
-             
-             // 生成自定义属性
-             val variables = mutableMapOf<String, String>()
-             config.customStats.filter { it.applyTo.contains(EntityType.FACTION) }.forEach { statConfig ->
-                 variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-             }
-
-             factions.add(Faction(
-                 id = "fac_${PlatformUtils.getCurrentTimeMillis()}_$i",
-                 name = name,
-                 description = "随机生成的阵营",
-                 reputation = 0,
-                 variables = variables
-             ))
+        config.rules.filter { it.type == EntityType.FACTION }.forEach { rule ->
+            for (i in 0 until rule.count) {
+                 var name = "阵营 $i"
+                 if (nameProvider != null) {
+                      if (rule.templateId != null) {
+                          name = nameProvider.generate(rule.templateId)
+                      } else {
+                          val place = nameProvider.generate("place_name")
+                          name = if (!place.startsWith("未知模板")) "$place 派" else "阵营 $i"
+                      }
+                 }
+                 
+                 // 生成自定义属性
+                 val variables = mutableMapOf<String, String>()
+                 rule.customStats.forEach { statConfig ->
+                     variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                 }
+    
+                 factions.add(Faction(
+                     id = "fac_${PlatformUtils.getCurrentTimeMillis()}_${factions.size}",
+                     name = name,
+                     description = "随机生成的阵营",
+                     reputation = 0,
+                     variables = variables
+                 ))
+            }
         }
         return factions
     }
 
     private suspend fun generateRandomEvents(): List<GameEvent> {
-        val count = random.nextInt(config.minRandomEvents, config.maxRandomEvents + 1)
         val events = mutableListOf<GameEvent>()
         val templates = listOf("Mysterious Signal", "Alien Invasion", "Ancient Ritual", "Festival of Lights", "Dragon Attack")
         
-        for (i in 0 until count) {
-            val name = if (nameProvider != null) {
-                 if (config.eventTemplateIds.isNotEmpty()) {
-                     nameProvider.generate(config.eventTemplateIds.random(random))
-                 } else {
-                     // Try to generate a catchy name
-                     // "Legacy of " + something? 
-                     // Simple fallback
-                     "事件: " + templates.random(random)
-                 }
-            } else {
-                 templates.random(random)
+        config.rules.filter { it.type == EntityType.EVENT }.forEach { rule ->
+            for (i in 0 until rule.count) {
+                val name = if (nameProvider != null) {
+                     if (rule.templateId != null) {
+                         nameProvider.generate(rule.templateId)
+                     } else {
+                         "事件: " + templates.random(random)
+                     }
+                } else {
+                     templates.random(random)
+                }
+                
+                // 生成自定义属性
+                val variables = mutableMapOf<String, String>()
+                rule.customStats.forEach { statConfig ->
+                    variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                }
+    
+                events.add(GameEvent(
+                    id = "evt_${PlatformUtils.getCurrentTimeMillis()}_${events.size}",
+                    name = name,
+                    description = "随机生成的事件",
+                    startNodeId = "", // Event usually connects to a start node
+                    variables = variables
+                ))
             }
-            
-            // 生成自定义属性
-            val variables = mutableMapOf<String, String>()
-            config.customStats.filter { it.applyTo.contains(EntityType.EVENT) }.forEach { statConfig ->
-                variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-            }
-
-            events.add(GameEvent(
-                id = "evt_${PlatformUtils.getCurrentTimeMillis()}_$i",
-                name = name,
-                description = "随机生成的事件",
-                startNodeId = "", // Event usually connects to a start node
-                variables = variables
-            ))
         }
         return events
     }
     
     private suspend fun generateRandomClues(): List<Clue> {
-        val count = random.nextInt(config.minRandomClues, config.maxRandomClues + 1)
         val clues = mutableListOf<Clue>()
         
-        for (i in 0 until count) {
-             var name = "线索 $i"
-             if (config.clueTemplateIds.isNotEmpty() && nameProvider != null) {
-                 name = nameProvider.generate(config.clueTemplateIds.random(random))
-             }
-             
-             // 生成自定义属性
-             val variables = mutableMapOf<String, String>()
-             config.customStats.filter { it.applyTo.contains(EntityType.CLUE) }.forEach { statConfig ->
-                 variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
-             }
-
-             clues.add(Clue(
-                 id = "clue_${PlatformUtils.getCurrentTimeMillis()}_$i",
-                 name = name,
-                 description = "关于故事真相的线索",
-                 isKnown = false,
-                 variables = variables
-             ))
+        config.rules.filter { it.type == EntityType.CLUE }.forEach { rule ->
+            for (i in 0 until rule.count) {
+                 var name = "线索 $i"
+                 if (nameProvider != null) {
+                      if (rule.templateId != null) {
+                          name = nameProvider.generate(rule.templateId)
+                      } else {
+                          name = nameProvider.generate("clue_name")
+                          if (name.startsWith("未知模板")) name = "神秘线索 $i"
+                      }
+                 }
+                 
+                 // 生成自定义属性
+                 val variables = mutableMapOf<String, String>()
+                 rule.customStats.forEach { statConfig ->
+                     variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+                 }
+    
+                 clues.add(Clue(
+                     id = "clue_${PlatformUtils.getCurrentTimeMillis()}_${clues.size}",
+                     name = name,
+                     description = "关于故事真相的线索",
+                     isKnown = false,
+                     variables = variables
+                 ))
+            }
         }
         return clues
     }
