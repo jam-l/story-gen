@@ -187,41 +187,18 @@ private fun GeneratorScreenContent(
     
     // Loaded Templates
     // allTemplates passed from parent
-    var selectedItemTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedEnemyTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedCharacterTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedLocationTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedEventTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedClueTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedFactionTemplates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedItemTemplate by remember { mutableStateOf<String?>(null) }
+    var selectedEnemyTemplate by remember { mutableStateOf<String?>(null) }
+    var selectedCharacterTemplate by remember { mutableStateOf<String?>(null) }
+    var selectedLocationTemplate by remember { mutableStateOf<String?>(null) }
+    var selectedEventTemplate by remember { mutableStateOf<String?>(null) }
+    var selectedClueTemplate by remember { mutableStateOf<String?>(null) }
+    var selectedFactionTemplate by remember { mutableStateOf<String?>(null) }
     
     var customStatConfigs by remember { mutableStateOf<List<CustomStatConfig>>(emptyList()) }
     
     LaunchedEffect(allTemplates) {
-        // Default selections (intelligent defaults) if not already selected
-        if (allTemplates.isNotEmpty()) {
-            if (selectedItemTemplates.isEmpty()) {
-                selectedItemTemplates = allTemplates.filter { it.id.contains("item") || it.id.contains("equipment") || it.id.contains("treasure") }.map { it.id }.toSet()
-            }
-            if (selectedEnemyTemplates.isEmpty()) {
-                selectedEnemyTemplates = allTemplates.filter { it.id.contains("monster") || it.id.contains("enemy") }.map { it.id }.toSet()
-            }
-            if (selectedCharacterTemplates.isEmpty()) {
-                 selectedCharacterTemplates = allTemplates.filter { it.id.contains("character") || it.id.contains("name") }.map { it.id }.toSet()
-            }
-            if (selectedLocationTemplates.isEmpty()) {
-                 selectedLocationTemplates = allTemplates.filter { it.id.contains("place") || it.id.contains("location") }.map { it.id }.toSet()
-            }
-            if (selectedEventTemplates.isEmpty()) {
-                 selectedEventTemplates = allTemplates.filter { it.id.contains("event") }.map { it.id }.toSet()
-            }
-             if (selectedClueTemplates.isEmpty()) {
-                 selectedClueTemplates = allTemplates.filter { it.id.contains("clue") || it.id.contains("item") }.map { it.id }.toSet()
-            }
-            if (selectedFactionTemplates.isEmpty()) {
-                 selectedFactionTemplates = allTemplates.filter { it.id.contains("sect")}.map { it.id }.toSet()
-            }
-        }
+        // Init logic if needed in future
     }
     
     Scaffold(
@@ -272,13 +249,13 @@ private fun GeneratorScreenContent(
                         difficulty = difficulty,
                         theme = selectedTheme,
                         namingStyle = selectedNamingStyle,
-                        itemTemplateIds = selectedItemTemplates.toList(),
-                        enemyTemplateIds = selectedEnemyTemplates.toList(),
-                        characterTemplateIds = selectedCharacterTemplates.toList(),
-                        locationTemplateIds = selectedLocationTemplates.toList(),
-                        eventTemplateIds = selectedEventTemplates.toList(),
-                        clueTemplateIds = selectedClueTemplates.toList(),
-                        factionTemplateIds = selectedFactionTemplates.toList(),
+                        itemTemplateIds = listOfNotNull(selectedItemTemplate),
+                        enemyTemplateIds = listOfNotNull(selectedEnemyTemplate),
+                        characterTemplateIds = listOfNotNull(selectedCharacterTemplate),
+                        locationTemplateIds = listOfNotNull(selectedLocationTemplate),
+                        eventTemplateIds = listOfNotNull(selectedEventTemplate),
+                        clueTemplateIds = listOfNotNull(selectedClueTemplate),
+                        factionTemplateIds = listOfNotNull(selectedFactionTemplate),
                         seed = if (useSeed) seed.toLongOrNull() else null,
                         customStats = customStatConfigs,
                         enemyMinHp = enemyMinHp.toInt(),
@@ -712,52 +689,52 @@ private fun GeneratorScreenContent(
                         Text("名称模板选择", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         
                         Text("道具生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("item") || it.id.contains("equipment") },
-                            selectedIds = selectedItemTemplates,
-                            onSelectionChange = { selectedItemTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedItemTemplate,
+                            onSelectionChange = { selectedItemTemplate = it }
                         )
 
                         Text("敌人生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("monster") || it.id.contains("enemy") },
-                            selectedIds = selectedEnemyTemplates,
-                            onSelectionChange = { selectedEnemyTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedEnemyTemplate,
+                            onSelectionChange = { selectedEnemyTemplate = it }
                         )
                         
                         Text("角色生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("character") || it.id.contains("name") },
-                            selectedIds = selectedCharacterTemplates,
-                            onSelectionChange = { selectedCharacterTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedCharacterTemplate,
+                            onSelectionChange = { selectedCharacterTemplate = it }
                         )
                         
                         Text("地点生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("place") || it.id.contains("location") },
-                            selectedIds = selectedLocationTemplates,
-                            onSelectionChange = { selectedLocationTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedLocationTemplate,
+                            onSelectionChange = { selectedLocationTemplate = it }
                         )
                         
                         Text("事件生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("event") },
-                            selectedIds = selectedEventTemplates,
-                            onSelectionChange = { selectedEventTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedEventTemplate,
+                            onSelectionChange = { selectedEventTemplate = it }
                         )
                         
                         Text("线索生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("clue") },
-                            selectedIds = selectedClueTemplates,
-                            onSelectionChange = { selectedClueTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedClueTemplate,
+                            onSelectionChange = { selectedClueTemplate = it }
                         )
                         
                         Text("阵营生成模板", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                        TemplateSelector(
-                            templates = allTemplates.filter { it.id.contains("sect") },
-                            selectedIds = selectedFactionTemplates,
-                            onSelectionChange = { selectedFactionTemplates = it }
+                        SingleTemplateSelector(
+                            templates = allTemplates,
+                            selectedId = selectedFactionTemplate,
+                            onSelectionChange = { selectedFactionTemplate = it }
                         )
                     }
                 }
@@ -827,32 +804,44 @@ private fun ProbabilityControl(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TemplateSelector(
+private fun SingleTemplateSelector(
     templates: List<com.novelsim.app.data.source.NameTemplate>,
-    selectedIds: Set<String>,
-    onSelectionChange: (Set<String>) -> Unit
+    selectedId: String?,
+    onSelectionChange: (String) -> Unit
 ) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+    var expanded by remember { mutableStateOf(false) }
+    val selectedTemplate = templates.find { it.id == selectedId }
+    
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
-        templates.forEach { template ->
-            FilterChip(
-                selected = selectedIds.contains(template.id),
-                onClick = {
-                    val newSelection = selectedIds.toMutableSet()
-                    if (newSelection.contains(template.id)) {
-                        newSelection.remove(template.id)
-                    } else {
-                        newSelection.add(template.id)
-                    }
-                    onSelectionChange(newSelection)
-                },
-                label = { Text(template.description.ifEmpty { template.id }) }
-            )
+        OutlinedTextField(
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            readOnly = true,
+            value = selectedTemplate?.description?.ifEmpty { selectedTemplate.id } ?: "请选择",
+            onValueChange = {},
+            label = { Text("选择模板") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            templates.forEach { template ->
+                DropdownMenuItem(
+                    text = { Text(template.description.ifEmpty { template.id }) },
+                    onClick = {
+                        onSelectionChange(template.id)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
         }
     }
 }

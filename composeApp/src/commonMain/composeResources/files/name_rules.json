@@ -1,100 +1,63 @@
 {
   "templates": [
     {
-      "id": "chinese_name_male",
+      "id": "chinese_name",
       "pattern": "{surname}{given}",
-      "description": "中文男名",
+      "description": "中文名",
       "parts": {
         "surname": {
           "file": "cnname.json",
           "path": "xing",
-          "weight": 90
+          "weight": 100
         },
         "given": {
           "file": "cnname.json",
           "path": "maleTwo",
-          "weight": 80
+          "weight": 40
         }
       },
       "variants": [
         {
-          "pattern": "{fuxing}{given}",
+          "pattern": "{surname}{given_female}",
+          "weight": 40,
+          "parts": {
+            "given_female": {
+              "file": "cnname.json",
+              "path": "femaleTwo"
+            }
+          }
+        },
+        {
+          "pattern": "{surname}{given_three_male}",
           "weight": 10,
+          "parts": {
+            "given_three_male": {
+              "file": "cnname.json",
+              "path": "maleThree"
+            }
+          }
+        },
+        {
+          "pattern": "{surname}{given_three_female}",
+          "weight": 10,
+          "parts": {
+            "given_three_female": {
+              "file": "cnname.json",
+              "path": "femaleThree"
+            }
+          }
+        },
+        {
+          "pattern": "{fuxing}{given}",
+          "weight": 5,
           "parts": {
             "fuxing": {
               "file": "cnname.json",
               "path": "fuxing"
             }
           }
-        },
-        {
-          "pattern": "{surname}{given_three}",
-          "weight": 20,
-          "parts": {
-            "given_three": {
-              "file": "cnname.json",
-              "path": "maleThree"
-            }
-          }
         }
       ]
-    },
-    {
-      "id": "chinese_name_female",
-      "pattern": "{surname}{given}",
-      "description": "中文女名",
-      "parts": {
-        "surname": {
-          "file": "cnname.json",
-          "path": "xing"
-        },
-        "given": {
-          "file": "cnname.json",
-          "path": "femaleTwo"
-        }
-      },
-      "variants": [
-        {
-          "pattern": "{surname}{given_three}",
-          "weight": 20,
-          "parts": {
-            "given_three": {
-              "file": "cnname.json",
-              "path": "femaleThree"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": "english_name",
-      "pattern": "{given}{name}",
-      "description": "英文男名",
-      "parts": {
-        "name": {
-          "file": "enname.json",
-          "path": "enxingzh"
-        },
-        "given": {
-          "file": "enname.json",
-          "path": "ennamezhmale"
-        }
-      }
-    },
-    {
-      "id": "english_name_female",
-      "pattern": "{given}{name}",
-      "description": "英文女名",
-      "parts": {
-        "name": {
-          "file": "enname.json",
-          "path": "enxingzh"
-        },
-        "given": {
-          "file": "enname.json",
-          "path": "ennamezhfemale"
-        }
-      }
     },
     {
       "id": "place_name",
@@ -140,9 +103,9 @@
       }
     },
     {
-      "id": "equipment_sword",
+      "id": "equipment_weapon",
       "pattern": "{quality}{material}{type}",
-      "description": "宝剑",
+      "description": "武器",
       "parts": {
         "quality": {
           "file": "other.json",
@@ -160,30 +123,19 @@
           "file": "zhuangbei.json",
           "path": "剑"
         }
-      }
-    },
-    {
-      "id": "equipment_blade",
-      "pattern": "{quality}{material}{type}",
-      "description": "宝刀",
-      "parts": {
-        "quality": {
-          "file": "other.json",
-          "path": "品质前缀",
-          "optional": true,
-          "probability": 0.3
-        },
-        "material": {
-          "file": "other.json",
-          "path": "材质前缀",
-          "optional": true,
-          "probability": 0.5
-        },
-        "type": {
-          "file": "zhuangbei.json",
-          "path": "刀"
+      },
+      "variants": [
+        {
+          "pattern": "{quality}{material}{blade_type}",
+          "weight": 50,
+          "parts": {
+            "blade_type": {
+              "file": "zhuangbei.json",
+              "path": "刀"
+            }
+          }
         }
-      }
+      ]
     },
     {
       "id": "treasure",
