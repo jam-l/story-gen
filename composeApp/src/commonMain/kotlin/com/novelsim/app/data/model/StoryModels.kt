@@ -51,7 +51,8 @@ data class StoryNode(
     val type: NodeType,
     val content: NodeContent,
     val position: NodePosition = NodePosition(),
-    val connections: List<Connection> = emptyList()
+    val connections: List<Connection> = emptyList(),
+    val locationId: String? = null // 所属地点/区域ID
 )
 
 /**
@@ -309,6 +310,8 @@ data class Location(
     val name: String,
     val description: String,
     val background: String? = null,
+    val position: NodePosition = NodePosition(), // 地点的中心地理坐标
+    val radius: Float = 500f, // 区域半径，用于判定节点归属
     val connectedLocationIds: List<String> = emptyList(),
     val npcs: List<String> = emptyList(),
     val events: List<String> = emptyList(),

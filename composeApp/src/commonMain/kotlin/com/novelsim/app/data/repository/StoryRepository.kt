@@ -54,11 +54,27 @@ class StoryRepository(
      */
     suspend fun getAllStories(): List<Story> {
         val dbStories = storyQueries.getAllStories().executeAsList()
-        if (dbStories.isEmpty()) {
-            // 首次运行，插入示例故事
-            saveStory(createSampleStory())
-            return listOf(loadStoryWithNodes("sample_story"))
+        val sampleId = "sample_story_v2"
+        
+        // 检查是否存在新版示例故事，如果不存在则自动添加
+        // 这确保了老用户也能获得带有新地图功能的示例故事
+        if (dbStories.none { it.id == sampleId }) {
+            try {
+                val newSample = createSampleStory()
+                saveStory(newSample)
+                // 重新获取列表
+                return storyQueries.getAllStories().executeAsList().map { loadStoryWithNodes(it.id) }
+            } catch (e: Exception) {
+                // 如果插入失败（例如旧数据冲突），则忽略
+                e.printStackTrace()
+            }
         }
+        
+        if (dbStories.isEmpty()) {
+             // 理论上上面的逻辑已经处理了空的情况，这里作为兜底
+             return emptyList()
+        }
+        
         return dbStories.map { loadStoryWithNodes(it.id) }
     }
     
@@ -205,7 +221,10 @@ class StoryRepository(
                     connectedLocationIdsJson = json.encodeToString(location.connectedLocationIds),
                     npcsJson = json.encodeToString(location.npcs),
                     eventsJson = json.encodeToString(location.events),
-                    variablesJson = json.encodeToString(location.variables)
+                    variablesJson = json.encodeToString(location.variables),
+                    positionX = location.position.x.toDouble(),
+                    positionY = location.position.y.toDouble(),
+                    radius = location.radius.toDouble()
                 )
             }
 
@@ -419,7 +438,10 @@ class StoryRepository(
             connectedLocationIdsJson = json.encodeToString(location.connectedLocationIds),
             npcsJson = json.encodeToString(location.npcs),
             eventsJson = json.encodeToString(location.events),
-            variablesJson = json.encodeToString(location.variables)
+            variablesJson = json.encodeToString(location.variables),
+            positionX = location.position.x.toDouble(),
+            positionY = location.position.y.toDouble(),
+            radius = location.radius.toDouble()
         )
     }
 
@@ -442,7 +464,9 @@ class StoryRepository(
             connectedLocationIds = try { json.decodeFromString(connectedLocationIdsJson) } catch (e: Exception) { emptyList() },
             npcs = try { json.decodeFromString(npcsJson) } catch (e: Exception) { emptyList() },
             events = try { json.decodeFromString(eventsJson) } catch (e: Exception) { emptyList() },
-            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
+            variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() },
+            position = NodePosition(positionX.toFloat(), positionY.toFloat()),
+            radius = radius.toFloat()
         )
     }
     
@@ -827,14 +851,55 @@ class StoryRepository(
             position = NodePosition(200f, 700f)
         )
         
+        // 创建地点
+        val townLoc = Location(
+            id = "loc_town",
+            name = "和平小镇",
+            description = "新手村，也就是你的家乡。",
+            position = NodePosition(350f, 400f),
+            radius = 300f,
+            connectedLocationIds = listOf("loc_forest")
+        )
+        
+        val forestLoc = Location(
+            id = "loc_forest",
+            name = "迷雾森林",
+            description = "充满了危险和机遇的森林。",
+            position = NodePosition(50f, 400f),
+            radius = 400f,
+            connectedLocationIds = listOf("loc_town", "loc_mountain")
+        )
+        
+        val mountainLoc = Location(
+            id = "loc_mountain",
+            name = "厄运山脉",
+            description = "决战之地。",
+            position = NodePosition(200f, 800f),
+            radius = 250f,
+            connectedLocationIds = listOf("loc_forest")
+        )
+
+        // 更新节点所属地点
+        nodes["town"] = nodes["town"]!!.copy(locationId = townLoc.id)
+        nodes["choice1"] = nodes["choice1"]!!.copy(locationId = townLoc.id)
+        nodes["inventory"] = nodes["inventory"]!!.copy(locationId = townLoc.id)
+        nodes["good_ending"] = nodes["good_ending"]!!.copy(locationId = townLoc.id)
+        
+        nodes["forest"] = nodes["forest"]!!.copy(locationId = forestLoc.id)
+        nodes["battle1"] = nodes["battle1"]!!.copy(locationId = forestLoc.id)
+        
+        nodes["win_ending"] = nodes["win_ending"]!!.copy(locationId = mountainLoc.id)
+        nodes["lose_ending"] = nodes["lose_ending"]!!.copy(locationId = mountainLoc.id)
+
         return Story(
-            id = "sample_story",
+            id = "sample_story_v3", // Force update for new map features and coordinate fix
             title = "示例冒险",
             author = "系统",
             description = "一个简单的冒险故事，展示游戏的基本功能。",
             startNodeId = "start",
             nodes = nodes,
             enemies = listOf(sampleEnemy),
+            locations = listOf(townLoc, forestLoc, mountainLoc), // 添加地点列表
             createdAt = PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis()
         )

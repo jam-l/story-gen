@@ -67,17 +67,20 @@ class RandomStoryGenerator(
         val namingStyle: NamingStyle = NamingStyle.AUTO,
         
         /** 生成规则列表 */
-        val rules: List<GenerationRule> = emptyList(),
+        /** 生成规则列表 */
+        val rules: List<GenerationRule> = listOf(
+            GenerationRule(type = EntityType.LOCATION, count = 6)
+        ),
 
         /** 敌人属性配置范围 (默认值，可被规则覆盖或作为兜底) */
-        val enemyMinHp: Int = 50,
-        val enemyMaxHp: Int = 200,
-        val enemyMinAtk: Int = 5,
-        val enemyMaxAtk: Int = 20,
+        val enemyMinHp: Int = 30,
+        val enemyMaxHp: Int = 100,
+        val enemyMinAtk: Int = 3,
+        val enemyMaxAtk: Int = 12,
         val enemyMinDef: Int = 0,
-        val enemyMaxDef: Int = 10,
+        val enemyMaxDef: Int = 5,
         val enemyMinSpeed: Int = 5,
-        val enemyMaxSpeed: Int = 15,
+        val enemyMaxSpeed: Int = 12,
 
         /** 角色属性配置范围 (默认值，可被规则覆盖或作为兜底) */
         val characterMinHp: Int = 80,
@@ -352,8 +355,10 @@ class RandomStoryGenerator(
         // 0. 生成核心元素 (道具、变量、敌人、角色、地点、阵营)
         val generatedItems = generateRandomItems()
         val generatedVariables = generateRandomVariables()
-        // 敌人通常随后续节点生成，但也可以预先生成一些
-        val preGeneratedEnemies = generateRandomEnemies()
+        // 敌人通常随后续节点生成，并按强度排序以支持难度曲线
+        val preGeneratedEnemies = generateRandomEnemies().sortedBy { 
+            it.stats.maxHp + it.stats.attack * 4 + it.stats.defense * 2 
+        }
         enemies.addAll(preGeneratedEnemies)
         
         val generatedCharacters = generateRandomCharacters()
@@ -388,7 +393,10 @@ class RandomStoryGenerator(
             
             val node = when (nodeType) {
                 // Pass generated lists to node creators to avoid hardcoding
-                NodeType.BATTLE -> createBattleNode(nodeId, currentX, currentY, enemies, preGeneratedEnemies)
+                NodeType.BATTLE -> {
+                    val progress = i.toFloat() / (mainDialogueCount.coerceAtLeast(1))
+                    createBattleNode(nodeId, currentX, currentY, enemies, preGeneratedEnemies, progress)
+                }
                 NodeType.CONDITION -> createConditionNode(nodeId, currentX, currentY, generatedVariables)
                 NodeType.ITEM -> createItemNode(nodeId, currentX, currentY, customItems, generatedItems)
                 NodeType.VARIABLE -> createVariableNode(nodeId, currentX, currentY, generatedVariables)
@@ -422,6 +430,17 @@ class RandomStoryGenerator(
             nodes[node.id] = node
             nodeIds.add(node.id)
         }
+
+        // 4.5 关联地点 (根据位置距离最近判定)
+        val nodesWithLocation = nodes.mapValues { (_, node) ->
+            val nearestLocation = generatedLocations.minByOrNull { loc ->
+                val dx = node.position.x - loc.position.x
+                val dy = node.position.y - loc.position.y
+                dx * dx + dy * dy
+            }
+            node.copy(locationId = nearestLocation?.id)
+        }
+        nodes.putAll(nodesWithLocation)
         
         // 5. 连接节点
         connectNodes(nodes, nodeIds)
@@ -567,13 +586,13 @@ class RandomStoryGenerator(
                      ).apply { currentHp = maxHp }
                  } else {
                      CharacterStats(
-                         maxHp = random.nextInt(config.enemyMinHp, config.enemyMaxHp + 1),
-                         currentHp = 0,
-                         attack = random.nextInt(config.enemyMinAtk, config.enemyMaxAtk + 1),
-                         defense = random.nextInt(config.enemyMinDef, config.enemyMaxDef + 1),
-                         speed = random.nextInt(config.enemyMinSpeed, config.enemyMaxSpeed + 1),
-                         exp = random.nextInt(5, 20)
-                     ).apply { currentHp = maxHp }
+                          maxHp = ((random.nextInt(config.enemyMinHp, config.enemyMaxHp + 1)) * (1 + config.difficulty * 0.3)).toInt(),
+                          currentHp = 0,
+                          attack = ((random.nextInt(config.enemyMinAtk, config.enemyMaxAtk + 1)) * (1 + config.difficulty * 0.3)).toInt(),
+                          defense = ((random.nextInt(config.enemyMinDef, config.enemyMaxDef + 1)) * (1 + config.difficulty * 0.2)).toInt(),
+                          speed = ((random.nextInt(config.enemyMinSpeed, config.enemyMaxSpeed + 1)) * (1 + config.difficulty * 0.2)).toInt(),
+                          exp = (random.nextInt(5, 20) * (1 + config.difficulty)).toInt()
+                      ).apply { currentHp = maxHp }
                  }
                 
                 // 生成自定义属性
@@ -660,34 +679,158 @@ class RandomStoryGenerator(
     
     private suspend fun generateRandomLocations(): List<Location> {
         val locations = mutableListOf<Location>()
+        val locationNames = listOf("新手村", "幽暗森林", "荒芜之地", "巨龙巢穴", "神秘遗迹", "繁华城镇")
         
-        config.rules.filter { it.type == EntityType.LOCATION }.forEach { rule ->
-             for (i in 0 until rule.count) {
-                var name = "地点 $i"
-                if (nameProvider != null) {
-                     if (rule.templateId != null) {
-                         name = nameProvider.generate(rule.templateId)
-                     } else {
-                         name = nameProvider.generate("place_name")
-                         if (name.startsWith("未知模板")) name = "神秘地点 $i"
-                     }
-                }
+        // 1. 预先计算总地点数，构建全局网格
+        // 防止不同 Rule 生成的地点及其内部循环生成的地点重叠
+        val locationRules = config.rules.filter { it.type == EntityType.LOCATION }
+        val totalLocationCount = locationRules.sumOf { it.count.coerceAtLeast(1) }
+        
+        // 动态计算网格行列数
+        // 地图比例 800:1400 (W:H) ≈ 1:1.75
+        // 设 gridCols = C, gridRows = R. 期望 R/C ≈ 1.75 且 R*C >= N
+        // C * (1.75 * C) >= N  =>  1.75 * C^2 >= N  =>  C >= sqrt(N / 1.75)
+        val gridCols = kotlin.math.ceil(kotlin.math.sqrt(totalLocationCount / 1.75f)).toInt().coerceAtLeast(2)
+        val gridRows = kotlin.math.ceil(totalLocationCount.toFloat() / gridCols).toInt()
+        
+        val cellWidth = 800f / gridCols
+        val cellHeight = 1400f / gridRows
+        
+        // 生成所有可用的格子索引 (col, row) 并随机打乱
+        val allSlots = mutableListOf<Pair<Int, Int>>()
+        for (r in 0 until gridRows) {
+            for (c in 0 until gridCols) {
+                allSlots.add(c to r)
+            }
+        }
+        // 使用配置的随机源打乱格子
+        val shuffledSlots = allSlots.shuffled(random).toMutableList()
+        
+        var generatedCount = 0
+
+        // 开始生成
+        locationRules.forEach { rule ->
+             for (i in 0 until rule.count.coerceAtLeast(1)) {
+                 var name = if (i < locationNames.size) locationNames[i] else "地点 $i"
+                 // 简化的名字生成逻辑
+                 if (nameProvider != null) {
+                      if (rule.templateId != null) {
+                          name = nameProvider.generate(rule.templateId)
+                      } else {
+                          val place = nameProvider.generate("place_name")
+                          if (!place.startsWith("未知模板")) name = place
+                      }
+                 }
+                 
+                // 分配唯一格子
+                // 如果格子用完了（理论上不会，因为 gridRows * gridCols >= N），则回退到随机
+                val slot = if (shuffledSlots.isNotEmpty()) shuffledSlots.removeAt(0) else (0 to 0)
+                val col = slot.first
+                val row = slot.second
                 
-                // 生成自定义属性
+                // 基础坐标 + 随机抖动 (保留 padding)
+                // 留出一定的边距，避免贴边或贴邻居太近
+                // 每个格子内部留出 padding = min(cellWidth, cellHeight) * 0.2
+                val paddingX = cellWidth * 0.15f
+                val paddingY = cellHeight * 0.15f
+                
+                val safeWidth = cellWidth - 2 * paddingX
+                val safeHeight = cellHeight - 2 * paddingY
+                
+                val jitterX = random.nextFloat() * safeWidth
+                val jitterY = random.nextFloat() * safeHeight
+                
+                // 坐标计算 (左上角 + padding + jitter)
+                val x = col * cellWidth + paddingX + jitterX
+                val y = row * cellHeight + paddingY + jitterY
+                
+                // 随机大小 (80-160)，但不能超过格子大小的一半太多
+                val maxRadius = kotlin.math.min(cellWidth, cellHeight) / 2f
+                val radius = (80f + random.nextFloat() * 80f).coerceAtMost(maxRadius)
+                
                 val variables = mutableMapOf<String, String>()
                 rule.customStats.forEach { statConfig ->
                     variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
                 }
-    
+
                 locations.add(Location(
                     id = "loc_${PlatformUtils.getCurrentTimeMillis()}_${locations.size}",
                     name = name,
-                    description = "这是一个随机生成的地点",
-                    variables = variables
+                    description = "区域：$name",
+                    position = NodePosition(x, y),
+                    radius = radius,
+                    variables = variables,
+                    connectedLocationIds = emptyList() // 稍后连接
                 ))
+                generatedCount++
             }
         }
-        return locations
+        
+        if (locations.isEmpty()) return emptyList()
+        if (locations.size == 1) return locations
+        
+        // 2. 构建连通图 (最小生成树 + 随机边)
+        val connected = mutableSetOf<String>()
+        val unvisited = locations.toMutableList()
+        val connections = mutableMapOf<String, MutableSet<String>>()
+        locations.forEach { connections[it.id] = mutableSetOf() }
+        
+        // 从第一个点开始
+        val first = unvisited.removeAt(0)
+        connected.add(first.id)
+        
+        // Prim算法变种生成MST
+        while (unvisited.isNotEmpty()) {
+            var minIsolator: Location? = null
+            var minConnectorId: String? = null
+            var minDistanceSq = Float.MAX_VALUE
+            
+            for (u in unvisited) {
+                for (cId in connected) {
+                    val cLoc = locations.find { it.id == cId }!!
+                    val dx = u.position.x - cLoc.position.x
+                    val dy = u.position.y - cLoc.position.y
+                    val distSq = dx * dx + dy * dy
+                    if (distSq < minDistanceSq) {
+                        minDistanceSq = distSq
+                        minIsolator = u
+                        minConnectorId = cId
+                    }
+                }
+            }
+            
+            if (minIsolator != null && minConnectorId != null) {
+                unvisited.remove(minIsolator)
+                connected.add(minIsolator.id)
+                connections[minIsolator.id]!!.add(minConnectorId)
+                connections[minConnectorId]!!.add(minIsolator.id)
+            } else {
+                break
+            }
+        }
+        
+        // 3. 添加一些随机额外连接
+        val extraEdges = (locations.size * 0.3).toInt()
+        repeat(extraEdges) {
+            val locA = locations.random()
+            val closest = locations
+                .filter { it.id != locA.id && !connections[locA.id]!!.contains(it.id) }
+                .minByOrNull { 
+                    val dx = it.position.x - locA.position.x
+                    val dy = it.position.y - locA.position.y
+                    dx * dx + dy * dy
+                }
+            
+            if (closest != null) {
+                connections[locA.id]!!.add(closest.id)
+                connections[closest.id]!!.add(locA.id)
+            }
+        }
+        
+        // 4. 更新Locaton对象
+        return locations.map { loc ->
+            loc.copy(connectedLocationIds = connections[loc.id]!!.toList())
+        }
     }
     
     private suspend fun generateRandomFactions(): List<Faction> {
@@ -874,17 +1017,14 @@ class RandomStoryGenerator(
         )
     }
     
-    private suspend fun createBattleNode(id: String, x: Float, y: Float, enemies: MutableList<Enemy>, availableEnemies: List<Enemy>): StoryNode {
-        // Reuse or clone a generated enemy
-        // If we have available enemies, pick one.
-        // To make it interesting, we can clone it and slighty stat mod it, OR just pick it (if unique enemies aren't required to be unique instances)
-        // Generally RPG enemies can be instantiated multiple times.
-        // But our Enemy model has an ID.
-        // If we reuse the SAME ID, it might be same state?
-        // Let's create a NEW enemy based on one of the available ones (as a template).
+    private suspend fun createBattleNode(id: String, x: Float, y: Float, enemies: MutableList<Enemy>, availableEnemies: List<Enemy>, progress: Float = 0f): StoryNode {
+        // Reuse or clone a generated enemy 
+        // We pick an enemy based on story progress (earlier nodes get weaker enemies)
         
         val templateEnemy = if (availableEnemies.isNotEmpty()) {
-            availableEnemies.random(random)
+            // 通过 progress 在排序后的敌人列表中选择合适的强度级别
+            val index = (progress * (availableEnemies.size - 1)).toInt()
+            availableEnemies[index]
         } else {
             // Fallback Create on the fly
              val fallbackName = if (nameProvider != null) nameProvider.generate("monster_beast") else "未知怪物"
@@ -1157,17 +1297,20 @@ class RandomStoryGenerator(
             )
         }
 
-        // 确保最后的对话节点连接到结局
-        if (dialogueNodes.isNotEmpty() && endingNodes.isNotEmpty()) {
+        // 确保最后的对话节点有连接
+        if (dialogueNodes.isNotEmpty()) {
             val lastDialogueId = dialogueNodes.last()
-
-            // 检查如果不包含连接才添加，避免覆盖之前的逻辑（如果有）
-            // 简单起见，这里强制连接最后一个，除非它已经有连接（在 chaos 逻辑中可能已经有）
             val lastNode = nodes[lastDialogueId]!!
+            
             if (lastNode.connections.isEmpty() || lastNode.connections[0].targetNodeId.isEmpty()) {
-                val endingId = endingNodes.first()
-                nodes[lastDialogueId] = lastNode.copy(connections = listOf(Connection(endingId)))
-                updateNodeNextId(nodes, lastDialogueId, endingId)
+                val targetId = if (endingNodes.isNotEmpty()) {
+                    endingNodes.first()
+                } else {
+                    // 无限模式：连接回到中间某个节点形成大循环
+                    if (dialogueNodes.size > 2) dialogueNodes[dialogueNodes.size / 2] else "start"
+                }
+                nodes[lastDialogueId] = lastNode.copy(connections = listOf(Connection(targetId)))
+                updateNodeNextId(nodes, lastDialogueId, targetId)
             }
         }
     }

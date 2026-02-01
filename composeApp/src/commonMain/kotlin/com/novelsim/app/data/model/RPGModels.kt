@@ -135,6 +135,47 @@ class CharacterStats(
         return CharacterStats(newMap)
     }
 
+    // -------------------------------------------------------------------------
+    // 经验与等级逻辑
+    // -------------------------------------------------------------------------
+
+    /**
+     * 添加经验值
+     * @return 是否升级
+     */
+    fun addExp(amount: Int): Boolean {
+        exp += amount
+        var leveledUp = false
+        while (exp >= expToNextLevel) {
+            levelUp()
+            leveledUp = true
+        }
+        return leveledUp
+    }
+
+    /**
+     * 升级逻辑
+     */
+    private fun levelUp() {
+        exp -= expToNextLevel
+        level += 1
+        
+        // 升级所需的经验值按指数增长
+        expToNextLevel = (expToNextLevel * 1.2).toInt()
+        
+        // 提升基础属性
+        maxHp = (maxHp * 1.1).toInt() + 5
+        currentHp = maxHp // 升级回满血
+        
+        maxMp = (maxMp * 1.05).toInt() + 2
+        currentMp = maxMp // 升级回满蓝
+        
+        attack = (attack * 1.1).toInt() + 2
+        defense = (defense * 1.1).toInt() + 1
+        speed = (speed * 1.05).toInt() + 1
+        luck = (luck * 1.05).toInt() + 1
+    }
+
     companion object {
         // 伪构造函数，保持源码兼容性
         operator fun invoke(

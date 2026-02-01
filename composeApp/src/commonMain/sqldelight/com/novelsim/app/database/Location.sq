@@ -9,6 +9,9 @@ CREATE TABLE Location (
     npcsJson TEXT NOT NULL DEFAULT '[]', -- List<String> characterIds
     eventsJson TEXT NOT NULL DEFAULT '[]', -- List<String> eventIds
     variablesJson TEXT NOT NULL DEFAULT '{}', -- Map<String, String> 实体级变量
+    positionX REAL NOT NULL DEFAULT 0.0,
+    positionY REAL NOT NULL DEFAULT 0.0,
+    radius REAL NOT NULL DEFAULT 500.0,
     PRIMARY KEY (id, storyId),
     FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
 );
@@ -23,8 +26,8 @@ SELECT * FROM Location WHERE id = ? AND storyId = ?;
 
 -- Insert or replace location
 insertLocation:
-INSERT OR REPLACE INTO Location(id, storyId, name, description, background, connectedLocationIdsJson, npcsJson, eventsJson, variablesJson)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Location(id, storyId, name, description, background, connectedLocationIdsJson, npcsJson, eventsJson, variablesJson, positionX, positionY, radius)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Delete location
 deleteLocation:

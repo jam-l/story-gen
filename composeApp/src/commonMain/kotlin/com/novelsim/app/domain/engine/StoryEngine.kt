@@ -78,6 +78,30 @@ class StoryEngine(
      * 获取当前故事
      */
     fun getCurrentStory(): Story? = currentStory
+    
+    /**
+     * 更新游戏状态
+     */
+    fun updateGameState(newState: GameState) {
+        currentGameState = newState
+    }
+
+    /**
+     * 获取所有地点信息
+     */
+    fun getLocations(): List<Location> = currentStory?.locations ?: emptyList()
+
+    /**
+     * 获取指定地点的所有节点
+     */
+    fun getNodesInLocation(locationId: String): List<StoryNode> {
+        return currentStory?.nodes?.values?.filter { it.locationId == locationId } ?: emptyList()
+    }
+
+    /**
+     * 获取所有故事节点 (用于全局地图)
+     */
+    fun getAllNodes(): List<StoryNode> = currentStory?.nodes?.values?.toList() ?: emptyList()
 
     /**
      * 获取敌人信息
@@ -455,16 +479,19 @@ class StoryEngine(
             }
             is Effect.ModifyAttribute -> {
                 val stats = state.playerStats
-                val newStats = when (effect.attribute.lowercase()) {
-                    "hp" -> stats.copy(currentHp = (stats.currentHp + effect.value).coerceIn(0, stats.maxHp))
-                    "mp" -> stats.copy(currentMp = (stats.currentMp + effect.value).coerceIn(0, stats.maxMp))
-                    "attack" -> stats.copy(attack = (stats.attack + effect.value).coerceAtLeast(0))
-                    "defense" -> stats.copy(defense = (stats.defense + effect.value).coerceAtLeast(0))
-                    "speed" -> stats.copy(speed = (stats.speed + effect.value).coerceAtLeast(0))
-                    "exp" -> stats.copy(exp = (stats.exp + effect.value).coerceAtLeast(0))
-                    else -> stats
+                when (effect.attribute.lowercase()) {
+                    "hp" -> stats.currentHp = (stats.currentHp + effect.value).coerceIn(0, stats.maxHp)
+                    "mp" -> stats.currentMp = (stats.currentMp + effect.value).coerceIn(0, stats.maxMp)
+                    "attack" -> stats.attack = (stats.attack + effect.value).coerceAtLeast(0)
+                    "defense" -> stats.defense = (stats.defense + effect.value).coerceAtLeast(0)
+                    "speed" -> stats.speed = (stats.speed + effect.value).coerceAtLeast(0)
+                    "exp" -> stats.addExp(effect.value)
+                    "gold" -> {
+                        currentGameState = state.copy(gold = (state.gold + effect.value).coerceAtLeast(0))
+                        return // Already updated state
+                    }
                 }
-                currentGameState = state.copy(playerStats = newStats)
+                currentGameState = state.copy(playerStats = stats)
             }
             is Effect.PlaySound -> {
                 // TODO: 实现音效播放 (需接入平台音频API)

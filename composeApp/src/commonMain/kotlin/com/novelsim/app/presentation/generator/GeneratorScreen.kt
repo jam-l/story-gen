@@ -188,6 +188,10 @@ private fun GeneratorScreenContent(
             RandomStoryGenerator.GenerationRule(
                 type = RandomStoryGenerator.EntityType.ENEMY,
                 count = 2
+            ),
+            RandomStoryGenerator.GenerationRule(
+                type = RandomStoryGenerator.EntityType.LOCATION,
+                count = 6
             )
         )) 
     }
