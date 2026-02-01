@@ -78,8 +78,8 @@ fun FactionEditor(screenModel: EditorScreenModel) {
                             modifier = Modifier.fillMaxWidth().padding(8.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("添加阵营")
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("新建")
                         }
                     }
                 }

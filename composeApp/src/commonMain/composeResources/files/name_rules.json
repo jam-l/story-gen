@@ -103,6 +103,17 @@
       }
     },
     {
+      "id": "skill_name_miji",
+      "pattern": "{name}",
+      "description": "秘籍招式",
+      "parts": {
+        "name": {
+          "file": "mijizhaoshi.json",
+          "path": "list.list"
+        }
+      }
+    },
+    {
       "id": "equipment_weapon",
       "pattern": "{quality}{material}{type}",
       "description": "武器",

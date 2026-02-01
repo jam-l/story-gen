@@ -433,6 +433,7 @@ data class GameState(
     // 存储所有具体的物品实例，key = instanceUid
     val itemInstances: MutableMap<String, ItemInstance> = mutableMapOf(),
     val equipment: Equipment = Equipment(),
+    val skills: List<String> = emptyList(), // Learned skill IDs
     val variables: MutableMap<String, String> = mutableMapOf(),
     // store entity specific variables: key="type:id:varKey", value="value"
     val entityVariables: MutableMap<String, String> = mutableMapOf(),

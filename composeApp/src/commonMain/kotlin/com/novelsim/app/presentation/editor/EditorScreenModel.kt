@@ -57,6 +57,7 @@ class EditorScreenModel(
         val enemies: List<Enemy> = emptyList(), // 怪物列表
         val items: List<Item> = emptyList(), // 道具列表
         val variables: List<String> = emptyList(), // 变量列表 (Key only)
+        val skills: List<com.novelsim.app.data.model.Skill> = emptyList(), // 技能列表
         val connectionDisplayMode: ConnectionDisplayMode = ConnectionDisplayMode.ALL
     )
 
@@ -107,6 +108,7 @@ class EditorScreenModel(
                 loadFactions()
                 loadEnemies()
                 loadItems()
+                loadSkills()
                 _uiState.update { it.copy(variables = story.variables.keys.toList()) }
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -190,11 +192,36 @@ class EditorScreenModel(
             )
         }
         
+        // 碰撞偏移逻辑：防止节点完全重叠
+        var finalX = x
+        var finalY = y
+        val existingNodes = _uiState.value.nodes
+        
+        // 节点大约宽160，高100-200。设置阈值以保证基本不重叠
+        val thresholdX = 180f
+        val thresholdY = 120f
+        
+        // 简单的螺旋/步进搜索，尝试找到一个空位
+        // 每次向右下移动 40 像素，最多尝试 50 次
+        var attempts = 0
+        while (attempts < 50) {
+            val collision = existingNodes.any {
+                kotlin.math.abs(it.node.position.x - finalX) < thresholdX &&
+                kotlin.math.abs(it.node.position.y - finalY) < thresholdY
+            }
+            if (!collision) break
+            
+            // 碰撞时偏移
+            finalX += 40f
+            finalY += 40f
+            attempts++
+        }
+
         val newNode = StoryNode(
             id = nodeId,
             type = type,
             content = content,
-            position = NodePosition(x, y)
+            position = NodePosition(finalX, finalY)
         )
         
         _uiState.value = _uiState.value.copy(
@@ -702,6 +729,43 @@ class EditorScreenModel(
         }
     }
 
+    // ============================================================================================
+    // 技能管理逻辑
+    // ============================================================================================
+    
+    /**
+     * 加载技能列表
+     */
+    private fun loadSkills() {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            val skills = storyRepository.getSkills(storyId)
+            _uiState.update { it.copy(skills = skills) }
+        }
+    }
+    
+    /**
+     * 保存技能
+     */
+    fun saveSkill(skill: com.novelsim.app.data.model.Skill) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.saveSkill(skill, storyId)
+            loadSkills()
+        }
+    }
+    
+    /**
+     * 删除技能
+     */
+    fun deleteSkill(skillId: String) {
+        val storyId = _uiState.value.story?.id ?: return
+        screenModelScope.launch {
+            storyRepository.deleteSkill(skillId, storyId)
+            loadSkills()
+        }
+    }
+
     /**
      * 导出为 JSON
      */
@@ -773,6 +837,136 @@ class EditorScreenModel(
                         variables = updatedStory.variables.keys.toList() 
                     ) 
                 }
+            }
+        }
+    }
+    
+    // ============================================================================================
+    // 随机生成逻辑
+    // ============================================================================================
+    
+    private var randomGenerator = com.novelsim.app.domain.generator.RandomStoryGenerator()
+    private var nameProvider: com.novelsim.app.data.source.RandomNameProvider? = null
+
+    private val _nameTemplates = MutableStateFlow<List<com.novelsim.app.data.source.NameTemplate>>(emptyList())
+    val nameTemplates: StateFlow<List<com.novelsim.app.data.source.NameTemplate>> = _nameTemplates.asStateFlow()
+
+    init {
+        screenModelScope.launch {
+             val provider = com.novelsim.app.data.source.RandomNameProvider()
+             try {
+                 provider.initialize { fileName ->
+                     @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
+                     novelsimulator.composeapp.generated.resources.Res.readBytes("files/$fileName").decodeToString()
+                 }
+                 nameProvider = provider
+                 randomGenerator = com.novelsim.app.domain.generator.RandomStoryGenerator(nameProvider = provider)
+                 _nameTemplates.value = provider.getTemplates()
+             } catch (e: Exception) {
+                 println("Failed to load name provider in Editor: ${e.message}")
+             }
+        }
+    }
+    
+
+     
+     fun generateRandomSkill(templateId: String? = null, callback: (Skill) -> Unit) {
+         screenModelScope.launch {
+             val actualTemplateId = templateId ?: "skill_name_miji"
+             val name = nameProvider?.generate(actualTemplateId) ?: "随机招式"
+             
+             val random = kotlin.random.Random.Default
+             val mpCost = random.nextInt(5, 50)
+             val isDamage = random.nextBoolean()
+             val damage = if (isDamage) random.nextInt(10, 100) else 0
+             val heal = if (!isDamage) random.nextInt(10, 80) else 0
+             
+             callback(Skill(
+                 id = "",
+                 name = name,
+                 description = "随机生成的招式",
+                 mpCost = mpCost,
+                 damage = damage,
+                 heal = heal,
+                 animation = "default"
+             ))
+         }
+     }
+
+    fun generateRandomCharacter(templateId: String? = null, count: Int = 1) {
+        screenModelScope.launch {
+            val rule = com.novelsim.app.domain.generator.RandomStoryGenerator.GenerationRule(
+                type = com.novelsim.app.domain.generator.RandomStoryGenerator.EntityType.CHARACTER,
+                templateId = templateId,
+                count = 1 // Rule count affects batch generation logic inside generator, but here calls createRandomCharacter (single). Pass 1 to avoid confusion or pass count? createRandomCharacter logic relies on rule.templateId. It ignores rule.count usually for single gen.
+            )
+            repeat(count) { i ->
+                val character = randomGenerator.createRandomCharacter(rule, index = _uiState.value.characters.size + 1 + i)
+                saveCharacter(character)
+            }
+        }
+    }
+
+    fun generateRandomItem(templateId: String? = null, count: Int = 1) {
+        screenModelScope.launch {
+            val rule = com.novelsim.app.domain.generator.RandomStoryGenerator.GenerationRule(
+                type = com.novelsim.app.domain.generator.RandomStoryGenerator.EntityType.ITEM,
+                templateId = templateId,
+                count = 1
+            )
+            repeat(count) { i ->
+                val item = randomGenerator.createRandomItem(rule, index = _uiState.value.items.size + 1 + i)
+                saveItem(item)
+            }
+        }
+    }
+    
+    fun generateRandomEnemy(templateId: String? = null, count: Int = 1) {
+        screenModelScope.launch {
+             val rule = com.novelsim.app.domain.generator.RandomStoryGenerator.GenerationRule(
+                type = com.novelsim.app.domain.generator.RandomStoryGenerator.EntityType.ENEMY,
+                templateId = templateId,
+                count = 1
+            )
+            repeat(count) { i ->
+                val enemy = randomGenerator.createRandomEnemy(rule, index = _uiState.value.enemies.size + 1 + i)
+                saveEnemy(enemy)
+            }
+        }
+    }
+    
+    fun generateRandomVariable(templateId: String? = null, count: Int = 1) {
+        val currentStory = _uiState.value.story ?: return
+        screenModelScope.launch {
+             val rule = com.novelsim.app.domain.generator.RandomStoryGenerator.GenerationRule(
+                type = com.novelsim.app.domain.generator.RandomStoryGenerator.EntityType.VARIABLE,
+                templateId = templateId,
+                count = 1
+            )
+            repeat(count) { i ->
+                val (name, value) = randomGenerator.createRandomVariable(
+                    rule, 
+                    index = currentStory.variables.size + 1 + i, 
+                    existingKeys = currentStory.variables.keys // Note: keys updating during loop? Ideally yes.
+                )
+                // saveVariable updates state async, so existingKeys might be stale in loop if executed fast. 
+                // But createRandomVariable just avoids collisions.
+                // saveVariable also updates local map.
+                saveVariable(name, value)
+            }
+        }
+    }
+
+    fun generateRandomLocation(templateId: String? = null, count: Int = 1) {
+        screenModelScope.launch {
+            val rule = com.novelsim.app.domain.generator.RandomStoryGenerator.GenerationRule(
+                type = com.novelsim.app.domain.generator.RandomStoryGenerator.EntityType.LOCATION,
+                templateId = templateId,
+                count = 1
+            )
+            repeat(count) { i ->
+                val location = randomGenerator.createRandomLocation(rule, index = _uiState.value.locations.size + 1 + i)
+                saveLocation(location)
             }
         }
     }

@@ -1,0 +1,35 @@
+-- Skill table: stores skill definitions
+CREATE TABLE Skill (
+    id TEXT NOT NULL,
+    storyId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    mpCost INTEGER NOT NULL DEFAULT 0,
+    damage INTEGER NOT NULL DEFAULT 0,
+    heal INTEGER NOT NULL DEFAULT 0,
+    effectJson TEXT,          -- JSON serialized SkillEffect
+    animation TEXT,
+    PRIMARY KEY (id, storyId),
+    FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
+);
+
+-- Get all skills for a story
+getSkillsForStory:
+SELECT * FROM Skill WHERE storyId = ?;
+
+-- Get single skill
+getSkillById:
+SELECT * FROM Skill WHERE id = ? AND storyId = ?;
+
+-- Insert or replace skill
+insertSkill:
+INSERT OR REPLACE INTO Skill(id, storyId, name, description, mpCost, damage, heal, effectJson, animation)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Delete skill
+deleteSkill:
+DELETE FROM Skill WHERE id = ? AND storyId = ?;
+
+-- Delete all skills for a story
+deleteSkillsForStory:
+DELETE FROM Skill WHERE storyId = ?;

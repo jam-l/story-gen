@@ -8,8 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,11 +22,29 @@ import com.novelsim.app.presentation.editor.components.CustomStatsEditor
 import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 import androidx.compose.material3.HorizontalDivider
 import com.novelsim.app.util.PlatformUtils
+import com.novelsim.app.presentation.editor.components.SkillSelectionDialog
+import com.novelsim.app.data.model.Skill
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 @Composable
 fun EnemyEditor(screenModel: EditorScreenModel) {
     val uiState by screenModel.uiState.collectAsState()
+    val nameTemplates by screenModel.nameTemplates.collectAsState()
+    var showRandomDialog by remember { mutableStateOf(false) }
     var selectedEnemyId by remember { mutableStateOf<String?>(null) }
+
+    if (showRandomDialog) {
+        com.novelsim.app.presentation.editor.components.RandomGenerationDialog(
+            title = "生成随机怪物",
+            templates = nameTemplates,
+            onDismissRequest = { showRandomDialog = false },
+            onConfirm = { templateId, count ->
+                screenModel.generateRandomEnemy(templateId, count)
+                showRandomDialog = false
+            }
+        )
+    }
     
     LaunchedEffect(uiState.enemies) {
         if (selectedEnemyId != null && uiState.enemies.none { it.id == selectedEnemyId }) {
@@ -69,22 +86,35 @@ fun EnemyEditor(screenModel: EditorScreenModel) {
                     
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        FilledTonalButton(
-                            onClick = {
-                                val newEnemy = Enemy(
-                                    id = "enemy_${PlatformUtils.getCurrentTimeMillis()}",
-                                    name = "新怪物",
-                                    description = "",
-                                    stats = CharacterStats(maxHp = 50, currentHp = 50, attack = 5)
-                                )
-                                screenModel.saveEnemy(newEnemy)
-                                selectedEnemyId = newEnemy.id
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(8.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("添加怪物")
+                        Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val newEnemy = Enemy(
+                                        id = "enemy_${PlatformUtils.getCurrentTimeMillis()}",
+                                        name = "新怪物",
+                                        description = "",
+                                        stats = CharacterStats(maxHp = 50, currentHp = 50, attack = 5)
+                                    )
+                                    screenModel.saveEnemy(newEnemy)
+                                    selectedEnemyId = newEnemy.id
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("新建")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = {
+                                    showRandomDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("随机")
+                            }
                         }
                     }
                 }
@@ -103,6 +133,7 @@ fun EnemyEditor(screenModel: EditorScreenModel) {
                 if (enemy != null) {
                     EnemyDetailEditor(
                         enemy = enemy,
+                        availableSkills = uiState.skills, // Pass skills
                         onSave = { screenModel.saveEnemy(it) },
                         onDelete = { 
                             screenModel.deleteEnemy(it) 
@@ -123,9 +154,11 @@ fun EnemyEditor(screenModel: EditorScreenModel) {
 }
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EnemyDetailEditor(
     enemy: Enemy,
+    availableSkills: List<Skill>,
     onSave: (Enemy) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -136,6 +169,20 @@ fun EnemyDetailEditor(
     var goldReward by remember(enemy) { mutableStateOf(enemy.goldReward) }
     
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showSkillDialog by remember { mutableStateOf(false) }
+
+    if (showSkillDialog) {
+        SkillSelectionDialog(
+            availableSkills = availableSkills,
+            onDismissRequest = { showSkillDialog = false },
+            onSkillSelected = { skill ->
+                if (skill.id !in enemy.skills) {
+                    onSave(enemy.copy(skills = enemy.skills + skill.id))
+                }
+                showSkillDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -256,6 +303,50 @@ fun EnemyDetailEditor(
                 }
             }
 
+        
+        // 技能列表
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("技能列表", style = MaterialTheme.typography.titleMedium)
+                    IconButton(onClick = { showSkillDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "添加技能")
+                    }
+                }
+                
+                if (enemy.skills.isEmpty()) {
+                    Text("暂无技能", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        enemy.skills.forEach { skillId ->
+                            val skillName = availableSkills.find { it.id == skillId }?.name ?: skillId
+                            InputChip(
+                                selected = true,
+                                onClick = { },
+                                label = { Text(skillName) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        modifier = Modifier.clickable {
+                                            onSave(enemy.copy(skills = enemy.skills - skillId))
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
         
         // 自定义数值属性
         CustomStatsEditor(

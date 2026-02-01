@@ -380,7 +380,8 @@ class StoryPlayerScreenModel(
         val currentBattleState = _uiState.value.battleState ?: return
         
         // 执行玩家回合
-        var newState = battleSystem.executePlayerTurn(currentBattleState, action)
+        val skillsMap = _uiState.value.story?.skills?.associateBy { it.id } ?: emptyMap()
+        var newState = battleSystem.executePlayerTurn(currentBattleState, action, skillsMap)
         _uiState.value = _uiState.value.copy(battleState = newState)
         
         // 如果战斗未结束且是敌人回合，执行敌人回合

@@ -3,6 +3,7 @@ package com.novelsim.app.domain.rpg
 import com.novelsim.app.data.model.CharacterStats
 import com.novelsim.app.data.model.Enemy
 import com.novelsim.app.data.model.EnemyDrop
+import com.novelsim.app.data.model.Skill
 import kotlin.random.Random
 
 /**
@@ -83,7 +84,7 @@ class BattleSystem {
     /**
      * 执行玩家回合
      */
-    fun executePlayerTurn(state: BattleState, action: BattleAction): BattleState {
+    fun executePlayerTurn(state: BattleState, action: BattleAction, skills: Map<String, Skill>): BattleState {
         if (state.phase != BattlePhase.PLAYER_TURN) return state
         
         var newState = state.copy(isDefending = false)
@@ -130,8 +131,46 @@ class BattleSystem {
             }
             
             is BattleAction.Skill -> {
-                // TODO: 实现技能系统
-                logs.add(BattleLog("技能系统开发中...", BattleLog.LogType.INFO))
+                val skill = skills[action.skillId]
+                if (skill != null) {
+                    if (state.playerStats.currentMp >= skill.mpCost) {
+                        val newMp = state.playerStats.currentMp - skill.mpCost
+                        var currentEnemyHp = state.enemyCurrentHp
+                        var newHp = state.playerStats.currentHp
+                        
+                        // Damage
+                        if (skill.damage > 0) {
+                             val totalAtk = state.playerStats.attack + skill.damage
+                             val (damage, isCritical) = calculateDamage(totalAtk, state.enemy.stats.defense, state.playerStats.luck)
+                             currentEnemyHp = (currentEnemyHp - damage).coerceAtLeast(0)
+                             logs.add(BattleLog("使用了 ${skill.name}，对 ${state.enemy.name} 造成 $damage 点伤害！", if(isCritical) BattleLog.LogType.CRITICAL else BattleLog.LogType.DAMAGE))
+                        }
+                        
+                        // Heal
+                        if (skill.heal > 0) {
+                             newHp = (newHp + skill.heal).coerceAtMost(state.playerStats.maxHp)
+                             logs.add(BattleLog("使用了 ${skill.name}，恢复了 ${skill.heal} 点生命！", BattleLog.LogType.HEAL))
+                        }
+                        
+                        if (skill.damage == 0 && skill.heal == 0) {
+                             logs.add(BattleLog("使用了 ${skill.name}！", BattleLog.LogType.INFO))
+                        }
+                        
+                        newState = newState.copy(
+                            playerStats = newState.playerStats.copy(currentHp = newHp, currentMp = newMp),
+                            enemyCurrentHp = currentEnemyHp
+                        )
+                        
+                        if (currentEnemyHp <= 0) {
+                            logs.add(BattleLog("${state.enemy.name} 被击败了！", BattleLog.LogType.INFO))
+                            newState = newState.copy(phase = BattlePhase.VICTORY)
+                        }
+                    } else {
+                        logs.add(BattleLog("MP不足！", BattleLog.LogType.INFO))
+                    }
+                } else {
+                    logs.add(BattleLog("技能不存在！", BattleLog.LogType.INFO))
+                }
             }
             
             is BattleAction.UseItem -> {

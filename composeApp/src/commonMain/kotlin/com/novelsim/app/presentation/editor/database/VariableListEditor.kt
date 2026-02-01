@@ -8,13 +8,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.novelsim.app.presentation.editor.EditorScreenModel
-// import com.novelsim.app.presentation.editor.components.HorizontalDivider // Removed incorrect import
 
 @Composable
 fun VariableListEditor(screenModel: EditorScreenModel) {
@@ -22,7 +23,21 @@ fun VariableListEditor(screenModel: EditorScreenModel) {
     val story = uiState.story ?: return
     val variables = story.variables.entries.toList()
     
+    val nameTemplates by screenModel.nameTemplates.collectAsState()
+    var showRandomDialog by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
+
+    if (showRandomDialog) {
+        com.novelsim.app.presentation.editor.components.RandomGenerationDialog(
+            title = "生成随机变量",
+            templates = nameTemplates,
+            onDismissRequest = { showRandomDialog = false },
+            onConfirm = { templateId, count ->
+                screenModel.generateRandomVariable(templateId, count)
+                showRandomDialog = false
+            }
+        )
+    }
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(
@@ -34,11 +49,7 @@ fun VariableListEditor(screenModel: EditorScreenModel) {
                 text = "全局变量管理",
                 style = MaterialTheme.typography.titleLarge
             )
-            Button(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("新建变量")
-            }
+        }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -97,10 +108,37 @@ fun VariableListEditor(screenModel: EditorScreenModel) {
                         )
                         HorizontalDivider()
                     }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilledTonalButton(
+                                onClick = { showAddDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("新建")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = { showRandomDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("随机")
+                            }
+                        }
+                    }
                 }
             }
         }
-    }
     
     if (showAddDialog) {
         var newKey by remember { mutableStateOf("") }

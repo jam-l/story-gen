@@ -5,6 +5,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -19,6 +21,8 @@ import com.novelsim.app.data.model.Character
 import com.novelsim.app.presentation.editor.components.StatInput
 import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 import com.novelsim.app.presentation.editor.components.CustomStatsEditor
+import com.novelsim.app.presentation.editor.components.SkillSelectionDialog
+import com.novelsim.app.data.model.Skill
 
 /**
  * 数据库编辑器主界面
@@ -30,7 +34,7 @@ fun DatabaseEditor(
     screenModel: EditorScreenModel
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物", "道具", "变量")
+    val tabs = listOf("角色", "地点", "事件", "线索", "阵营", "怪物", "道具", "技能", "变量")
 
     Scaffold(
         topBar = {
@@ -49,7 +53,10 @@ fun DatabaseEditor(
                 )
 
                 // 标签栏
-                TabRow(selectedTabIndex = selectedTab) {
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTab,
+                    edgePadding = 0.dp
+                ) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
@@ -71,7 +78,8 @@ fun DatabaseEditor(
                 4 -> FactionEditor(screenModel)
                 5 -> EnemyEditor(screenModel)
                 6 -> ItemEditor(screenModel)
-                7 -> VariableListEditor(screenModel)
+                7 -> SkillEditor(screenModel)
+                8 -> VariableListEditor(screenModel)
             }
         }
     }
@@ -80,7 +88,21 @@ fun DatabaseEditor(
 @Composable
 fun CharacterEditor(screenModel: EditorScreenModel) {
     val uiState by screenModel.uiState.collectAsState()
+    val nameTemplates by screenModel.nameTemplates.collectAsState()
+    var showRandomDialog by remember { mutableStateOf(false) }
     var selectedCharacterId by remember { mutableStateOf<String?>(null) }
+
+    if (showRandomDialog) {
+        com.novelsim.app.presentation.editor.components.RandomGenerationDialog(
+            title = "生成随机角色",
+            templates = nameTemplates,
+            onDismissRequest = { showRandomDialog = false },
+            onConfirm = { templateId, count ->
+                screenModel.generateRandomCharacter(templateId, count)
+                showRandomDialog = false
+            }
+        )
+    }
     
     // 监听角色列表变化，如果选中角色被删除，取消选中
     LaunchedEffect(uiState.characters) {
@@ -123,21 +145,34 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
                     
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        FilledTonalButton(
-                            onClick = {
-                                val newChar = Character(
-                                    id = "char_${com.novelsim.app.util.PlatformUtils.getCurrentTimeMillis()}",
-                                    name = "新角色",
-                                    description = ""
-                                )
-                                screenModel.saveCharacter(newChar)
-                                selectedCharacterId = newChar.id
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(8.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("添加角色")
+                        Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val newChar = Character(
+                                        id = "char_${com.novelsim.app.util.PlatformUtils.getCurrentTimeMillis()}",
+                                        name = "新角色",
+                                        description = ""
+                                    )
+                                    screenModel.saveCharacter(newChar)
+                                    selectedCharacterId = newChar.id
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("新建")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = {
+                                    showRandomDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("随机")
+                            }
                         }
                     }
                 }
@@ -156,6 +191,7 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
                 if (character != null) {
                     CharacterDetailEditor(
                         character = character,
+                        availableSkills = uiState.skills, // Skills list
                         onSave = { screenModel.saveCharacter(it) },
                         onDelete = { 
                             screenModel.deleteCharacter(it) 
@@ -175,9 +211,11 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CharacterDetailEditor(
     character: Character,
+    availableSkills: List<Skill>,
     onSave: (Character) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -185,6 +223,20 @@ fun CharacterDetailEditor(
     var description by remember(character) { mutableStateOf(character.description) }
     var stats by remember(character) { mutableStateOf(character.baseStats) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showSkillDialog by remember { mutableStateOf(false) }
+
+    if (showSkillDialog) {
+        SkillSelectionDialog(
+            availableSkills = availableSkills,
+            onDismissRequest = { showSkillDialog = false },
+            onSkillSelected = { skill ->
+                if (skill.id !in character.skills) {
+                    onSave(character.copy(skills = character.skills + skill.id))
+                }
+                showSkillDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -301,6 +353,50 @@ fun CharacterDetailEditor(
                     ) {
                         stats = stats.copy(luck = it)
                         onSave(character.copy(baseStats = stats))
+                    }
+                }
+            }
+        }
+        
+        // 技能列表
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("技能列表", style = MaterialTheme.typography.titleMedium)
+                    IconButton(onClick = { showSkillDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "添加技能")
+                    }
+                }
+                
+                if (character.skills.isEmpty()) {
+                    Text("暂无技能", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        character.skills.forEach { skillId ->
+                            val skillName = availableSkills.find { it.id == skillId }?.name ?: skillId
+                            InputChip(
+                                selected = true,
+                                onClick = { },
+                                label = { Text(skillName) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        modifier = Modifier.clickable {
+                                            onSave(character.copy(skills = character.skills - skillId))
+                                        }
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }

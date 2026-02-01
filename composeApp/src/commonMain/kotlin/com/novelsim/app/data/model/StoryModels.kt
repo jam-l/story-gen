@@ -282,7 +282,8 @@ data class Story(
     val locations: List<Location> = emptyList(),
     val events: List<GameEvent> = emptyList(),
     val clues: List<Clue> = emptyList(),
-    val factions: List<Faction> = emptyList()
+    val factions: List<Faction> = emptyList(),
+    val skills: List<Skill> = emptyList()
 )
 
 /**
@@ -298,6 +299,7 @@ data class Character(
     val factionId: String? = null,
     val relationships: Map<String, Int> = emptyMap(),
     val tags: List<String> = emptyList(),
+    val skills: List<String> = emptyList(),
     val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
@@ -368,6 +370,7 @@ data class StoryPackage(
     val events: List<GameEvent> = emptyList(),
     val clues: List<Clue> = emptyList(),
     val factions: List<Faction> = emptyList(),
-    val customItems: List<ItemInstance> = emptyList()
+    val customItems: List<ItemInstance> = emptyList(),
+    val skills: List<Skill> = emptyList()
 )
 

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +31,21 @@ import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 @Composable
 fun ItemEditor(screenModel: EditorScreenModel) {
     val uiState by screenModel.uiState.collectAsState()
+    val nameTemplates by screenModel.nameTemplates.collectAsState()
+    var showRandomDialog by remember { mutableStateOf(false) }
     var selectedItemId by remember { mutableStateOf<String?>(null) }
+
+    if (showRandomDialog) {
+        com.novelsim.app.presentation.editor.components.RandomGenerationDialog(
+            title = "生成随机道具",
+            templates = nameTemplates,
+            onDismissRequest = { showRandomDialog = false },
+            onConfirm = { templateId, count ->
+                screenModel.generateRandomItem(templateId, count)
+                showRandomDialog = false
+            }
+        )
+    }
     
     // 监听列表变化
     LaunchedEffect(uiState.items) {
@@ -70,26 +85,42 @@ fun ItemEditor(screenModel: EditorScreenModel) {
                         )
                         HorizontalDivider()
                     }
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val newItem = Item(
+                                        id = "item_${PlatformUtils.getCurrentTimeMillis()}",
+                                        name = "新道具",
+                                        description = "这是一个新道具",
+                                        type = ItemType.CONSUMABLE,
+                                        price = 10
+                                    )
+                                    screenModel.saveItem(newItem)
+                                    selectedItemId = newItem.id
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("新建")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = {
+                                    showRandomDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("随机")
+                            }
+                        }
+                    }
                 }
                 
-                FilledTonalButton(
-                    onClick = {
-                        val newItem = Item(
-                            id = "item_${PlatformUtils.getCurrentTimeMillis()}",
-                            name = "新道具",
-                            description = "这是一个新道具",
-                            type = ItemType.CONSUMABLE,
-                            price = 10
-                        )
-                        screenModel.saveItem(newItem)
-                        selectedItemId = newItem.id
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("添加道具")
-                }
             }
         }
 

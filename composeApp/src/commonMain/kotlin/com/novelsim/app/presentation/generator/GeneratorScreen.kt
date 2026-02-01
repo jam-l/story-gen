@@ -794,6 +794,7 @@ private fun getEntityTypeLabel(type: RandomStoryGenerator.EntityType): String {
         RandomStoryGenerator.EntityType.EVENT -> "事件"
         RandomStoryGenerator.EntityType.CLUE -> "线索"
         RandomStoryGenerator.EntityType.VARIABLE -> "变量"
+        RandomStoryGenerator.EntityType.SKILL -> "技能"
     }
 }
 

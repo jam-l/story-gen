@@ -31,6 +31,7 @@ class StoryRepository(
     private val factionQueries = database.factionQueries
     private val enemyQueries = database.enemyQueries
     private val itemQueries = database.itemQueries
+    private val skillQueries = database.skillQueries
 
     
     private val json = Json { 
@@ -125,6 +126,7 @@ class StoryRepository(
             events = eventQueries.getEventsForStory(storyId).executeAsList().map { it.toGameEvent() },
             clues = clueQueries.getCluesForStory(storyId).executeAsList().map { it.toClue() },
             factions = factionQueries.getFactionsForStory(storyId).executeAsList().map { it.toFaction() },
+            skills = skillQueries.getSkillsForStory(storyId).executeAsList().map { it.toSkill() },
             
             createdAt = dbStory.createdAt,
             updatedAt = dbStory.updatedAt
@@ -173,6 +175,7 @@ class StoryRepository(
                     statsJson = json.encodeToString(enemy.stats),
                     expReward = enemy.expReward.toLong(),
                     goldReward = enemy.goldReward.toLong(),
+                    skillsJson = json.encodeToString(enemy.skills),
                     variablesJson = json.encodeToString(enemy.variables)
                 )
             }
@@ -206,6 +209,7 @@ class StoryRepository(
                     factionId = character.factionId,
                     relationshipsJson = json.encodeToString(character.relationships),
                     tagsJson = json.encodeToString(character.tags),
+                    skillsJson = json.encodeToString(character.skills),
                     variablesJson = json.encodeToString(character.variables)
                 )
             }
@@ -262,6 +266,21 @@ class StoryRepository(
                     description = faction.description,
                     reputation = faction.reputation.toLong(),
                     variablesJson = json.encodeToString(faction.variables)
+                )
+            }
+            
+            // 批量保存技能
+            story.skills.forEach { skill ->
+                skillQueries.insertSkill(
+                    id = skill.id,
+                    storyId = story.id,
+                    name = skill.name,
+                    description = skill.description,
+                    mpCost = skill.mpCost.toLong(),
+                    damage = skill.damage.toLong(),
+                    heal = skill.heal.toLong(),
+                    effectJson = if (skill.effect != null) json.encodeToString(skill.effect) else null,
+                    animation = skill.animation
                 )
             }
         }
@@ -386,6 +405,7 @@ class StoryRepository(
             factionId = character.factionId,
             relationshipsJson = json.encodeToString(character.relationships),
             tagsJson = json.encodeToString(character.tags),
+            skillsJson = json.encodeToString(character.skills),
             variablesJson = json.encodeToString(character.variables)
         )
     }
@@ -410,6 +430,7 @@ class StoryRepository(
             factionId = factionId,
             relationships = try { json.decodeFromString(relationshipsJson) } catch (e: Exception) { emptyMap() },
             tags = try { json.decodeFromString(tagsJson) } catch (e: Exception) { emptyList() },
+            skills = try { json.decodeFromString(skillsJson) } catch (e: Exception) { emptyList() },
             variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
@@ -629,6 +650,7 @@ class StoryRepository(
             statsJson = json.encodeToString(enemy.stats),
             expReward = enemy.expReward.toLong(),
             goldReward = enemy.goldReward.toLong(),
+            skillsJson = json.encodeToString(enemy.skills),
             variablesJson = json.encodeToString(enemy.variables)
         )
     }
@@ -651,6 +673,7 @@ class StoryRepository(
             stats = try { json.decodeFromString(statsJson) } catch (e: Exception) { CharacterStats() },
             expReward = expReward.toInt(),
             goldReward = goldReward.toInt(),
+            skills = try { json.decodeFromString(skillsJson) } catch (e: Exception) { emptyList() },
             variables = try { json.decodeFromString(variablesJson) } catch (e: Exception) { emptyMap() }
         )
     }
@@ -900,8 +923,61 @@ class StoryRepository(
             nodes = nodes,
             enemies = listOf(sampleEnemy),
             locations = listOf(townLoc, forestLoc, mountainLoc), // 添加地点列表
+            skills = emptyList(),
             createdAt = PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis()
+        )
+    }
+
+    
+    // ============================================================================================
+    // 技能管理方法
+    // ============================================================================================
+
+    /**
+     * 获取故事的所有技能
+     */
+    suspend fun getSkills(storyId: String): List<Skill> {
+        return skillQueries.getSkillsForStory(storyId).executeAsList().map { it.toSkill() }
+    }
+
+    /**
+     * 保存技能
+     */
+    suspend fun saveSkill(skill: Skill, storyId: String) {
+        skillQueries.insertSkill(
+            id = skill.id,
+            storyId = storyId,
+            name = skill.name,
+            description = skill.description,
+            mpCost = skill.mpCost.toLong(),
+            damage = skill.damage.toLong(),
+            heal = skill.heal.toLong(),
+            effectJson = if (skill.effect != null) json.encodeToString(skill.effect) else null,
+            animation = skill.animation
+        )
+    }
+
+    /**
+     * 删除技能
+     */
+    suspend fun deleteSkill(skillId: String, storyId: String) {
+        skillQueries.deleteSkill(skillId, storyId)
+    }
+
+    /**
+     * 数据库实体转领域模型
+     */
+    private fun com.novelsim.app.database.Skill.toSkill(): Skill {
+        return Skill(
+            id = id,
+            name = name,
+            description = description,
+            mpCost = mpCost.toInt(),
+            damage = damage.toInt(),
+            heal = heal.toInt(),
+            effect = if (effectJson != null) json.decodeFromString(effectJson) else null,
+            animation = animation
         )
     }
 }

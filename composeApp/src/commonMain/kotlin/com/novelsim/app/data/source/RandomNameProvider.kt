@@ -191,12 +191,31 @@ class RandomNameProvider(
         
         // 2. 获取路径对应的数据列表
         val fileData = loadedData[fileName] ?: return "ErrorLoad:$fileName"
-        val list = fileData[jsonPath] 
         
-        // 尝试模糊匹配或直接匹配
+        // Try strict match
+        var list = fileData[jsonPath] 
+        
+        // Fallback: Try finding a key that ends with the path or is contained
         if (list == null) {
-            // 特殊处理层级结构深的 JSON (如 mijizhaoshi.json)
-            // 这里做一个简化假设：loadDataFile 已经把这一层展平了
+            // 尝试常见变体
+            val candidates = listOf("list", "list.list", "root.list")
+            for (candidate in candidates) {
+                list = fileData[candidate]
+                if (list != null) break
+            }
+            
+            // 如果还是找不到，尝试搜索
+            if (list == null) {
+                val foundKey = fileData.keys.find { it.endsWith(jsonPath) || jsonPath.endsWith(it) }
+                if (foundKey != null) {
+                    list = fileData[foundKey]
+                }
+            }
+        }
+    
+        if (list == null || list.isEmpty()) {
+            // Debug info
+            // println("Keys available in $fileName: ${fileData.keys}")
             return "NoPath:$jsonPath"
         }
         
@@ -220,16 +239,17 @@ class RandomNameProvider(
      * 解析不同结构的 JSON 为统一的 Map<Path, List<String>> 格式
      */
     private fun parseJsonToMap(fileName: String, content: String): Map<String, List<String>> {
-        val result = mutableMapOf<String, List<String>>()
+        val result = mutableMapOf<String, MutableList<String>>()
         val jsonElement = json.parseToJsonElement(content)
         
         // 递归展平 JSON
         flattenJson(jsonElement, "", result)
         
+        println("Loaded $fileName, keys found: ${result.keys}")
         return result
     }
     
-    private fun flattenJson(element: kotlinx.serialization.json.JsonElement, prefix: String, result: MutableMap<String, List<String>>) {
+    private fun flattenJson(element: kotlinx.serialization.json.JsonElement, prefix: String, result: MutableMap<String, MutableList<String>>) {
         if (element is kotlinx.serialization.json.JsonObject) {
             for ((key, value) in element) {
                 // 特殊处理 "list" 结构 (如 zhuangbei.json)
@@ -253,7 +273,7 @@ class RandomNameProvider(
                             }
                         }
                     } else {
-                        // 普通数组
+                        // 普通数组或对象数组 (如 mijizhaoshi.json)
                         flattenJson(value, if (prefix.isEmpty()) key else "$prefix.$key", result)
                     }
                 } else {
@@ -265,7 +285,12 @@ class RandomNameProvider(
             val isStringArray = element.all { it is kotlinx.serialization.json.JsonPrimitive && it.isString }
             if (isStringArray) {
                 val list = element.map { it.toString().trim('"') }
-                result[prefix] = list
+                result.getOrPut(prefix) { mutableListOf() }.addAll(list)
+            } else {
+                // 如果是包含对象的数组，递归处理 (保持前缀不变，从而合并同构数据)
+                element.forEach { 
+                    flattenJson(it, prefix, result)
+                }
             }
         }
     }

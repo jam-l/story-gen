@@ -8,8 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +22,21 @@ import com.novelsim.app.presentation.editor.components.EntityVariableEditor
 @Composable
 fun LocationEditor(screenModel: EditorScreenModel) {
     val uiState by screenModel.uiState.collectAsState()
+    val nameTemplates by screenModel.nameTemplates.collectAsState()
+    var showRandomDialog by remember { mutableStateOf(false) }
     var selectedLocationId by remember { mutableStateOf<String?>(null) }
+
+    if (showRandomDialog) {
+        com.novelsim.app.presentation.editor.components.RandomGenerationDialog(
+            title = "生成随机地点",
+            templates = nameTemplates,
+            onDismissRequest = { showRandomDialog = false },
+            onConfirm = { templateId, count ->
+                screenModel.generateRandomLocation(templateId, count)
+                showRandomDialog = false
+            }
+        )
+    }
     
     // 监听地点列表变化，如果选中地点被删除，取消选中
     LaunchedEffect(uiState.locations) {
@@ -66,21 +79,34 @@ fun LocationEditor(screenModel: EditorScreenModel) {
 
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        FilledTonalButton(
-                            onClick = {
-                                val newLocation = Location(
-                                    id = "loc_${PlatformUtils.getCurrentTimeMillis()}",
-                                    name = "新地点",
-                                    description = ""
-                                )
-                                screenModel.saveLocation(newLocation)
-                                selectedLocationId = newLocation.id
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(8.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("添加地点")
+                        Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val newLocation = Location(
+                                        id = "loc_${PlatformUtils.getCurrentTimeMillis()}",
+                                        name = "新地点",
+                                        description = ""
+                                    )
+                                    screenModel.saveLocation(newLocation)
+                                    selectedLocationId = newLocation.id
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("新建")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = {
+                                    showRandomDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("随机")
+                            }
                         }
                     }
                 }
