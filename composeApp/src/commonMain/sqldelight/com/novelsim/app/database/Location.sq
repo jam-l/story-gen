@@ -7,6 +7,8 @@ CREATE TABLE Location (
     background TEXT,
     connectedLocationIdsJson TEXT NOT NULL DEFAULT '[]', -- List<String>
     npcsJson TEXT NOT NULL DEFAULT '[]', -- List<String> characterIds
+    enemiesJson TEXT NOT NULL DEFAULT '[]', -- List<String> enemyIds
+    itemsJson TEXT NOT NULL DEFAULT '[]', -- List<String> itemIds
     eventsJson TEXT NOT NULL DEFAULT '[]', -- List<String> eventIds
     variablesJson TEXT NOT NULL DEFAULT '{}', -- Map<String, String> 实体级变量
     positionX REAL NOT NULL DEFAULT 0.0,
@@ -26,8 +28,8 @@ SELECT * FROM Location WHERE id = ? AND storyId = ?;
 
 -- Insert or replace location
 insertLocation:
-INSERT OR REPLACE INTO Location(id, storyId, name, description, background, connectedLocationIdsJson, npcsJson, eventsJson, variablesJson, positionX, positionY, radius)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Location(id, storyId, name, description, background, connectedLocationIdsJson, npcsJson, enemiesJson, itemsJson, eventsJson, variablesJson, positionX, positionY, radius)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Delete location
 deleteLocation:

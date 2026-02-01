@@ -300,6 +300,7 @@ data class Character(
     val relationships: Map<String, Int> = emptyMap(),
     val tags: List<String> = emptyList(),
     val skills: List<String> = emptyList(),
+    val locationId: String? = null, // 所属地点 ID
     val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
@@ -316,6 +317,8 @@ data class Location(
     val radius: Float = 500f, // 区域半径，用于判定节点归属
     val connectedLocationIds: List<String> = emptyList(),
     val npcs: List<String> = emptyList(),
+    val enemies: List<String> = emptyList(), // 关联的怪物 ID 列表
+    val items: List<String> = emptyList(),     // 关联的道具 ID 列表
     val events: List<String> = emptyList(),
     val variables: Map<String, String> = emptyMap() // 实体级变量
 )

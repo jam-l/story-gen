@@ -7,6 +7,7 @@ CREATE TABLE StoryNode (
     positionX REAL NOT NULL DEFAULT 0,
     positionY REAL NOT NULL DEFAULT 0,
     connectionsJson TEXT NOT NULL DEFAULT '[]',
+    locationId TEXT, -- 关联的地点 ID
     PRIMARY KEY (id, storyId),
     FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
 );
@@ -21,8 +22,8 @@ SELECT * FROM StoryNode WHERE id = ? AND storyId = ?;
 
 -- Insert or replace node
 insertNode:
-INSERT OR REPLACE INTO StoryNode(id, storyId, type, contentJson, positionX, positionY, connectionsJson)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO StoryNode(id, storyId, type, contentJson, positionX, positionY, connectionsJson, locationId)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Update node content only
 updateNodeContent:

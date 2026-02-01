@@ -10,6 +10,7 @@ CREATE TABLE Character (
     relationshipsJson TEXT NOT NULL DEFAULT '{}', -- Map<String, Int> targetId -> affinity
     tagsJson TEXT NOT NULL DEFAULT '[]', -- List<String>
     skillsJson TEXT NOT NULL DEFAULT '[]', -- List<String>
+    locationId TEXT, -- 所属地点 ID
     variablesJson TEXT NOT NULL DEFAULT '{}', -- Map<String, String> 实体级变量
     PRIMARY KEY (id, storyId),
     FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
@@ -25,8 +26,8 @@ SELECT * FROM Character WHERE id = ? AND storyId = ?;
 
 -- Insert or replace character
 insertCharacter:
-INSERT OR REPLACE INTO Character(id, storyId, name, description, avatar, baseStatsJson, factionId, relationshipsJson, tagsJson, skillsJson, variablesJson)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Character(id, storyId, name, description, avatar, baseStatsJson, factionId, relationshipsJson, tagsJson, skillsJson, locationId, variablesJson)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Delete character
 deleteCharacter:

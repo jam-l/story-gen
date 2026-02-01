@@ -136,6 +136,7 @@ fun ItemEditor(screenModel: EditorScreenModel) {
                 if (item != null) {
                     ItemDetailEditor(
                         item = item,
+                        availableLocations = uiState.locations, // Pass locations
                         onSave = { screenModel.saveItem(it) },
                         onDelete = { 
                             screenModel.deleteItem(it)
@@ -159,6 +160,7 @@ fun ItemEditor(screenModel: EditorScreenModel) {
 @Composable
 fun ItemDetailEditor(
     item: Item,
+    availableLocations: List<com.novelsim.app.data.model.Location>,
     onSave: (Item) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -249,6 +251,46 @@ fun ItemDetailEditor(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+
+                // 所属地点选择
+                var showLocationMenu by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = showLocationMenu,
+                    onExpandedChange = { showLocationMenu = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val currentLocationName = availableLocations.find { it.id == item.locationId }?.name ?: "无 (未分配)"
+                    OutlinedTextField(
+                        value = currentLocationName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("获得地点") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showLocationMenu) },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = showLocationMenu,
+                        onDismissRequest = { showLocationMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("无 (未分配)") },
+                            onClick = {
+                                onSave(item.copy(locationId = null))
+                                showLocationMenu = false
+                            }
+                        )
+                        availableLocations.forEach { loc ->
+                            DropdownMenuItem(
+                                text = { Text(loc.name) },
+                                onClick = {
+                                    onSave(item.copy(locationId = loc.id))
+                                    showLocationMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     StatInput(

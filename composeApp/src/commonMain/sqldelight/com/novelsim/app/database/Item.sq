@@ -10,6 +10,7 @@ CREATE TABLE Item (
     stackable INTEGER NOT NULL DEFAULT 1, -- Boolean 0/1
     maxStack INTEGER NOT NULL DEFAULT 99,
     icon TEXT,
+    locationId TEXT, -- 获得地点 ID
     variablesJson TEXT NOT NULL DEFAULT '{}', -- Map<String, String> 实体级变量
     PRIMARY KEY (id, storyId),
     FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
@@ -25,8 +26,8 @@ SELECT * FROM Item WHERE id = ? AND storyId = ?;
 
 -- Insert or replace item
 insertItem:
-INSERT OR REPLACE INTO Item(id, storyId, name, description, type, effectJson, price, stackable, maxStack, icon, variablesJson)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Item(id, storyId, name, description, type, effectJson, price, stackable, maxStack, icon, locationId, variablesJson)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Delete item
 deleteItem:

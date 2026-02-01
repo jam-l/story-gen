@@ -69,7 +69,10 @@ class RandomStoryGenerator(
         /** 生成规则列表 */
         /** 生成规则列表 */
         val rules: List<GenerationRule> = listOf(
-            GenerationRule(type = EntityType.LOCATION, count = 6)
+            GenerationRule(type = EntityType.LOCATION, count = 10),
+            GenerationRule(type = EntityType.CHARACTER, count = 5),
+            GenerationRule(type = EntityType.ENEMY, count = 8),
+            GenerationRule(type = EntityType.ITEM, count = 12)
         ),
 
         /** 敌人属性配置范围 (默认值，可被规则覆盖或作为兜底) */
@@ -475,6 +478,41 @@ class RandomStoryGenerator(
             node.copy(locationId = nearestLocation?.id)
         }
         nodes.putAll(nodesWithLocation)
+
+        // 4.6 实体关联地点 (分配 NPC, 怪物, 道具到地点)
+        val locationNpcMap = mutableMapOf<String, MutableList<String>>()
+        val locationEnemyMap = mutableMapOf<String, MutableList<String>>()
+        val locationItemMap = mutableMapOf<String, MutableList<String>>()
+        
+        // 分配角色 (NPC)
+        val charactersWithLocation = generatedCharacters.map { char ->
+            val targetLocation = generatedLocations.random(random)
+            locationNpcMap.getOrPut(targetLocation.id) { mutableListOf() }.add(char.id)
+            char.copy(locationId = targetLocation.id)
+        }
+        
+        // 分配怪物 (Enemy)
+        val enemiesWithLocation = enemies.map { enemy ->
+            val targetLocation = generatedLocations.random(random)
+            locationEnemyMap.getOrPut(targetLocation.id) { mutableListOf() }.add(enemy.id)
+            enemy.copy(locationId = targetLocation.id)
+        }
+        
+        // 分配道具 (Item)
+        val itemsWithLocation = generatedItems.map { item ->
+            val targetLocation = generatedLocations.random(random)
+            locationItemMap.getOrPut(targetLocation.id) { mutableListOf() }.add(item.id)
+            item.copy(locationId = targetLocation.id)
+        }
+        
+        // 更新地点数据
+        val locationsWithEntities = generatedLocations.map { loc ->
+            loc.copy(
+                npcs = locationNpcMap[loc.id] ?: emptyList(),
+                enemies = locationEnemyMap[loc.id] ?: emptyList(),
+                items = locationItemMap[loc.id] ?: emptyList()
+            )
+        }
         
         // 5. 连接节点
         connectNodes(nodes, nodeIds)
@@ -488,12 +526,12 @@ class RandomStoryGenerator(
             nodes = nodes,
             createdAt = PlatformUtils.getCurrentTimeMillis(),
             updatedAt = PlatformUtils.getCurrentTimeMillis(),
-            items = generatedItems,
+            items = itemsWithLocation,
             variables = generatedVariables,
             customItems = customItems,
-            enemies = enemies,
-            characters = generatedCharacters,
-            locations = generatedLocations,
+            enemies = enemiesWithLocation,
+            characters = charactersWithLocation,
+            locations = locationsWithEntities,
             factions = generatedFactions,
             events = generatedEvents,
             clues = generatedClues,
@@ -843,8 +881,10 @@ class RandomStoryGenerator(
         val gridCols = kotlin.math.ceil(kotlin.math.sqrt(totalLocationCount / 1.75f)).toInt().coerceAtLeast(2)
         val gridRows = kotlin.math.ceil(totalLocationCount.toFloat() / gridCols).toInt()
         
-        val cellWidth = 800f / gridCols
-        val cellHeight = 1400f / gridRows
+        // 地图比例应随节点数量动态扩展
+        val totalHeight = (config.maxNodes + 2) * 280f 
+        val cellWidth = 600f / gridCols
+        val cellHeight = totalHeight / gridRows
         
         // 生成所有可用的格子索引 (col, row) 并随机打乱
         val allSlots = mutableListOf<Pair<Int, Int>>()
@@ -859,6 +899,9 @@ class RandomStoryGenerator(
         var generatedCount = 0
 
         // 开始生成
+        val gridTotalWidth = gridCols * cellWidth
+        val horizontalOffset = 400f - gridTotalWidth / 2f
+        
         locationRules.forEach { rule ->
              for (i in 0 until rule.count.coerceAtLeast(1)) {
                  var name = if (i < locationNames.size) locationNames[i] else "地点 $i"
@@ -873,14 +916,10 @@ class RandomStoryGenerator(
                  }
                  
                 // 分配唯一格子
-                // 如果格子用完了（理论上不会，因为 gridRows * gridCols >= N），则回退到随机
                 val slot = if (shuffledSlots.isNotEmpty()) shuffledSlots.removeAt(0) else (0 to 0)
                 val col = slot.first
                 val row = slot.second
                 
-                // 基础坐标 + 随机抖动 (保留 padding)
-                // 留出一定的边距，避免贴边或贴邻居太近
-                // 每个格子内部留出 padding = min(cellWidth, cellHeight) * 0.2
                 val paddingX = cellWidth * 0.15f
                 val paddingY = cellHeight * 0.15f
                 
@@ -890,13 +929,13 @@ class RandomStoryGenerator(
                 val jitterX = random.nextFloat() * safeWidth
                 val jitterY = random.nextFloat() * safeHeight
                 
-                // 坐标计算 (左上角 + padding + jitter)
-                val x = col * cellWidth + paddingX + jitterX
+                // 坐标计算 (应用水平偏移使其居中)
+                val x = horizontalOffset + col * cellWidth + paddingX + jitterX
                 val y = row * cellHeight + paddingY + jitterY
                 
-                // 随机大小 (80-160)，但不能超过格子大小的一半太多
+                // 随机大小 (60-120)，进一步缩小默认大小以适应紧凑布局
                 val maxRadius = kotlin.math.min(cellWidth, cellHeight) / 2f
-                val radius = (80f + random.nextFloat() * 80f).coerceAtMost(maxRadius)
+                val radius = (60f + random.nextFloat() * 60f).coerceAtMost(maxRadius)
                 
                 locations.add(createRandomLocation(rule, i, x, y, name, radius))
                 generatedCount++

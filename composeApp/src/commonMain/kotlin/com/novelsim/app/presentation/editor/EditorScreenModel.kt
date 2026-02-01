@@ -315,6 +315,47 @@ class EditorScreenModel(
             }
         }
     }
+
+    /**
+     * 更新节点位置关联
+     */
+    fun updateNodeLocation(nodeId: String, locationId: String?) {
+        _uiState.update { state ->
+            val updatedNodes = state.nodes.map { editorNode ->
+                if (editorNode.node.id == nodeId) {
+                    editorNode.copy(node = editorNode.node.copy(locationId = locationId))
+                } else {
+                    editorNode
+                }
+            }
+            state.copy(
+                nodes = updatedNodes,
+                selectedNode = if (state.selectedNode?.id == nodeId) {
+                    updatedNodes.find { it.node.id == nodeId }?.node
+                } else state.selectedNode
+            )
+        }
+    }
+
+    /**
+     * 定位到地点
+     */
+    fun focusOnLocation(locationId: String) {
+        val location = _uiState.value.locations.find { it.id == locationId } ?: return
+        
+        // 自动切换到画布模式
+        if (_uiState.value.isListMode) {
+            _uiState.update { it.copy(isListMode = false) }
+        }
+        
+        // 动画偏移画布 (简化实现，直接设置)
+        _uiState.update { state ->
+            state.copy(
+                canvasOffsetX = -location.position.x * state.canvasScale + 400f,
+                canvasOffsetY = -location.position.y * state.canvasScale + 300f
+            )
+        }
+    }
     
     /**
      * 添加连接

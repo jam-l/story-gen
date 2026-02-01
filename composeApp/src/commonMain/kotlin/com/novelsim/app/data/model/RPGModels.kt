@@ -297,6 +297,7 @@ data class Item(
     val price: Int = 0,
     val stackable: Boolean = true,
     val maxStack: Int = 99,
+    val locationId: String? = null, // Path for location association
     val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 
@@ -367,6 +368,7 @@ data class Enemy(
     val drops: List<EnemyDrop> = emptyList(),
     val expReward: Int = 10,
     val goldReward: Int = 5,
+    val locationId: String? = null, // Path for location association
     val variables: Map<String, String> = emptyMap() // 实体级变量
 )
 

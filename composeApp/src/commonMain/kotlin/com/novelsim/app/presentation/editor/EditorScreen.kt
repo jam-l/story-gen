@@ -82,7 +82,10 @@ data class EditorScreen(
                     onToggleViewMode = { screenModel.toggleViewMode() },
                     onOpenDatabase = { screenModel.toggleDatabaseEditor(true) },
                     connectionDisplayMode = uiState.connectionDisplayMode,
-                    onConnectionModeChange = { screenModel.setConnectionDisplayMode(it) }
+                    onConnectionModeChange = { screenModel.setConnectionDisplayMode(it) },
+                    selectedNode = uiState.selectedNode,
+                    locations = uiState.locations,
+                    onLocate = { screenModel.focusOnLocation(it) }
                 )
             },
             floatingActionButton = {
@@ -168,6 +171,8 @@ data class EditorScreen(
                                     items = uiState.items,
                                     variables = uiState.variables.associateWith { "" }, // Only keys are needed for dropdowns
                                     onContentChange = { screenModel.updateNodeContent(node.id, it) },
+                                    onLocationChange = { screenModel.updateNodeLocation(node.id, it) },
+                                    onLocate = { id -> screenModel.focusOnLocation(id) },
                                     onDelete = { screenModel.deleteNode(node.id) },
                                     onClose = { screenModel.closeNodeEditor() }
                                 )
@@ -201,11 +206,16 @@ private fun EditorTopBar(
     onToggleViewMode: () -> Unit,
     onOpenDatabase: () -> Unit,
     connectionDisplayMode: EditorScreenModel.ConnectionDisplayMode,
-    onConnectionModeChange: (EditorScreenModel.ConnectionDisplayMode) -> Unit
+    onConnectionModeChange: (EditorScreenModel.ConnectionDisplayMode) -> Unit,
+    selectedNode: StoryNode? = null,
+    locations: List<Location> = emptyList(),
+    onLocate: (String) -> Unit = {}
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var editedTitle by remember(title) { mutableStateOf(title) }
+    
+    val scope = rememberCoroutineScope()
     
     TopAppBar(
         title = {
@@ -236,6 +246,36 @@ private fun EditorTopBar(
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+            
+            // 当前地点显示 & 一键定位
+            selectedNode?.locationId?.let { locId ->
+                val location = locations.find { it.id == locId }
+                if (location != null) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Button(
+                        onClick = { onLocate(locId) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier.height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = "定位到地点",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = location.name,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         },
@@ -782,10 +822,13 @@ private fun NodeEditorPanel(
     items: List<Item> = emptyList(),
     variables: Map<String, String> = emptyMap(),
     onContentChange: (NodeContent) -> Unit,
+    onLocationChange: (String?) -> Unit,
+    onLocate: (String) -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var locationExpanded by remember { mutableStateOf(false) }
     
     Card(
         modifier = Modifier
@@ -831,6 +874,82 @@ private fun NodeEditorPanel(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 地点关联
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    OutlinedCard(
+                        onClick = { locationExpanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val location = locations.find { it.id == node.locationId }
+                            Text(
+                                text = location?.name ?: "选择关联地点...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (location != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                if (location != null) Icons.Default.LocationOn else Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = if (location != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    DropdownMenu(
+                        expanded = locationExpanded,
+                        onDismissRequest = { locationExpanded = false },
+                        modifier = Modifier.width(260.dp)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("无关联 (默认)") },
+                            leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null) },
+                            onClick = {
+                                onLocationChange(null)
+                                locationExpanded = false
+                            }
+                        )
+                        HorizontalDivider()
+                        locations.forEach { loc ->
+                            DropdownMenuItem(
+                                text = { Text(loc.name) },
+                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                onClick = {
+                                    onLocationChange(loc.id)
+                                    locationExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                if (node.locationId != null) {
+                    IconButton(
+                        onClick = { onLocate(node.locationId) },
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = "定位",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             

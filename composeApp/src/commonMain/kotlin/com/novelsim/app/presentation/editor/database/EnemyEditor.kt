@@ -133,7 +133,8 @@ fun EnemyEditor(screenModel: EditorScreenModel) {
                 if (enemy != null) {
                     EnemyDetailEditor(
                         enemy = enemy,
-                        availableSkills = uiState.skills, // Pass skills
+                        availableSkills = uiState.skills,
+                        availableLocations = uiState.locations, // Pass locations
                         onSave = { screenModel.saveEnemy(it) },
                         onDelete = { 
                             screenModel.deleteEnemy(it) 
@@ -154,11 +155,12 @@ fun EnemyEditor(screenModel: EditorScreenModel) {
 }
 
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun EnemyDetailEditor(
     enemy: Enemy,
     availableSkills: List<Skill>,
+    availableLocations: List<com.novelsim.app.data.model.Location>,
     onSave: (Enemy) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -236,6 +238,46 @@ fun EnemyDetailEditor(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+
+                // 所属地点选择
+                var showLocationMenu by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = showLocationMenu,
+                    onExpandedChange = { showLocationMenu = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val currentLocationName = availableLocations.find { it.id == enemy.locationId }?.name ?: "无 (未分配)"
+                    OutlinedTextField(
+                        value = currentLocationName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("出现地点") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showLocationMenu) },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = showLocationMenu,
+                        onDismissRequest = { showLocationMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("无 (未分配)") },
+                            onClick = {
+                                onSave(enemy.copy(locationId = null))
+                                showLocationMenu = false
+                            }
+                        )
+                        availableLocations.forEach { loc ->
+                            DropdownMenuItem(
+                                text = { Text(loc.name) },
+                                onClick = {
+                                    onSave(enemy.copy(locationId = loc.id))
+                                    showLocationMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
         

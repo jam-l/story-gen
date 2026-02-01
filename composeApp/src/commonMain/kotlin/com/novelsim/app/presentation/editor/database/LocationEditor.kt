@@ -125,6 +125,14 @@ fun LocationEditor(screenModel: EditorScreenModel) {
                 if (location != null) {
                     LocationDetailEditor(
                         location = location,
+                        allCharacters = uiState.characters,
+                        allEnemies = uiState.enemies,
+                        allItems = uiState.items,
+                        allNodes = uiState.nodes,
+                        onNodeClick = { nodeId ->
+                            screenModel.toggleDatabaseEditor(false)
+                            screenModel.selectNode(nodeId)
+                        },
                         onSave = { screenModel.saveLocation(it) },
                         onDelete = { 
                             screenModel.deleteLocation(it) 
@@ -145,9 +153,15 @@ fun LocationEditor(screenModel: EditorScreenModel) {
 }
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LocationDetailEditor(
     location: Location,
+    allCharacters: List<com.novelsim.app.data.model.Character>,
+    allEnemies: List<com.novelsim.app.data.model.Enemy>,
+    allItems: List<com.novelsim.app.data.model.Item>,
+    allNodes: List<EditorScreenModel.EditorNode>,
+    onNodeClick: (String) -> Unit,
     onSave: (Location) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -222,19 +236,94 @@ fun LocationDetailEditor(
             }
         }
         
-        // TODO: 连接的地点编辑器 (Connected Locations)
+        // 连接的地点编辑器 (Connected Locations)
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("连接的地点 (TODO)", style = MaterialTheme.typography.titleMedium)
-                Text("将在后续版本实现地点连接可视化编辑", style = MaterialTheme.typography.bodySmall)
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("连接的地点", style = MaterialTheme.typography.titleMedium)
+                if (location.connectedLocationIds.isEmpty()) {
+                    Text("暂无连接地点", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        location.connectedLocationIds.forEach { targetId ->
+                            AssistChip(onClick = {}, label = { Text(targetId) })
+                        }
+                    }
+                }
+            }
+        }
+
+        // 关联剧情 (Associated Story Nodes)
+        val locationNodes = allNodes.filter { it.node.locationId == location.id }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("关联剧情节点 (${locationNodes.size})", style = MaterialTheme.typography.titleMedium)
+                if (locationNodes.isEmpty()) {
+                    Text("暂无关联剧情", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        locationNodes.forEach { editorNode ->
+                            AssistChip(
+                                onClick = { 
+                                    // 点击跳转到该节点
+                                    onNodeClick(editorNode.node.id)
+                                }, 
+                                label = { Text(editorNode.node.id) },
+                                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            )
+                        }
+                    }
+                }
             }
         }
         
-        // TODO: NPC 列表编辑器
-         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("包含的 NPC (TODO)", style = MaterialTheme.typography.titleMedium)
-                 Text("将在后续版本实现 NPC 分配", style = MaterialTheme.typography.bodySmall)
+        // NPC 列表
+        Card(modifier = Modifier.fillMaxWidth()) {
+            val locationNpcs = allCharacters.filter { it.locationId == location.id }
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("常驻 NPC (${locationNpcs.size})", style = MaterialTheme.typography.titleMedium)
+                if (locationNpcs.isEmpty()) {
+                    Text("暂无 NPC", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        locationNpcs.forEach { npc ->
+                            SuggestionChip(onClick = {}, label = { Text(npc.name) })
+                        }
+                    }
+                }
+            }
+        }
+
+        // 怪物列表
+        Card(modifier = Modifier.fillMaxWidth()) {
+            val locationEnemies = allEnemies.filter { it.locationId == location.id }
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("出现怪物 (${locationEnemies.size})", style = MaterialTheme.typography.titleMedium)
+                if (locationEnemies.isEmpty()) {
+                    Text("暂无怪物", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        locationEnemies.forEach { enemy ->
+                            SuggestionChip(onClick = {}, label = { Text(enemy.name) })
+                        }
+                    }
+                }
+            }
+        }
+
+        // 道具列表
+        Card(modifier = Modifier.fillMaxWidth()) {
+            val locationItems = allItems.filter { it.locationId == location.id }
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("产出道具 (${locationItems.size})", style = MaterialTheme.typography.titleMedium)
+                if (locationItems.isEmpty()) {
+                    Text("暂无道具", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        locationItems.forEach { item ->
+                            SuggestionChip(onClick = {}, label = { Text(item.name) })
+                        }
+                    }
+                }
             }
         }
         

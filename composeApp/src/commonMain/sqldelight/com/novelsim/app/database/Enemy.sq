@@ -8,6 +8,7 @@ CREATE TABLE Enemy (
     expReward INTEGER NOT NULL DEFAULT 0,
     goldReward INTEGER NOT NULL DEFAULT 0,
     skillsJson TEXT NOT NULL DEFAULT '[]', -- List<String>
+    locationId TEXT, -- 出现地点 ID
     variablesJson TEXT NOT NULL DEFAULT '{}', -- Map<String, String> 实体级变量
     PRIMARY KEY (id, storyId),
     FOREIGN KEY (storyId) REFERENCES Story(id) ON DELETE CASCADE
@@ -23,8 +24,8 @@ SELECT * FROM Enemy WHERE id = ? AND storyId = ?;
 
 -- Insert or replace enemy
 insertEnemy:
-INSERT OR REPLACE INTO Enemy(id, storyId, name, description, statsJson, expReward, goldReward, skillsJson, variablesJson)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Enemy(id, storyId, name, description, statsJson, expReward, goldReward, skillsJson, locationId, variablesJson)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Delete enemy
 deleteEnemy:

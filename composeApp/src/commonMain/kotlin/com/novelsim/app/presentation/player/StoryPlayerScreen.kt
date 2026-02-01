@@ -59,6 +59,26 @@ data class StoryPlayerScreen(
         LaunchedEffect(saveId) {
             saveId?.let { screenModel.loadFromSave(it) }
         }
+
+        // 地点变换提示
+        var lastLocationId by remember { mutableStateOf<String?>(uiState.currentNode?.locationId) }
+        var showLocationToast by remember { mutableStateOf(false) }
+        var locationTitle by remember { mutableStateOf("") }
+        
+        val story = uiState.story
+        LaunchedEffect(uiState.currentNode) {
+            val currentLocId = uiState.currentNode?.locationId
+            if (currentLocId != lastLocationId && currentLocId != null && story != null) {
+                val loc = story.locations.find { it.id == currentLocId }
+                if (loc != null) {
+                    locationTitle = loc.name
+                    showLocationToast = true
+                    kotlinx.coroutines.delay(3000)
+                    showLocationToast = false
+                }
+            }
+            lastLocationId = currentLocId
+        }
         
         Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
             when {
@@ -160,6 +180,47 @@ data class StoryPlayerScreen(
                     onDismiss = { screenModel.toggleVariableViewer() }
                 )
             }
+
+            // 地点切换提示 Toast
+            AnimatedVisibility(
+                visible = showLocationToast,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = RoundedCornerShape(24.dp),
+                    tonalElevation = 4.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "到达新地点",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                locationTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -194,6 +255,8 @@ private fun StoryContent(
     ) {
         // 顶部工具栏
         StoryTopBar(
+            currentNode = node,
+            locations = uiState.story?.locations ?: emptyList(),
             onBack = onBack,
             onSave = onSave,
             onInventory = onInventory,
@@ -288,6 +351,8 @@ private fun StoryContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StoryTopBar(
+    currentNode: StoryNode?,
+    locations: List<Location>,
     onBack: () -> Unit,
     onSave: () -> Unit,
     onInventory: () -> Unit,
@@ -297,7 +362,37 @@ private fun StoryTopBar(
     onMap: () -> Unit
 ) {
     TopAppBar(
-        title = { },
+        title = { 
+            currentNode?.locationId?.let { locId ->
+                val location = locations.find { it.id == locId }
+                if (location != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape(16.dp),
+                        onClick = onMap
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = location.name,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -320,7 +415,7 @@ private fun StoryTopBar(
                 Icon(Icons.Default.Done, contentDescription = "存档")
             }
             IconButton(onClick = onMap) {
-                Icon(Icons.Default.LocationOn, contentDescription = "地图")
+                Icon(Icons.Default.Place, contentDescription = "地图", tint = MaterialTheme.colorScheme.primary)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(

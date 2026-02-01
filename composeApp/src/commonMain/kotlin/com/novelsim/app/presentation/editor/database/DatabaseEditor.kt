@@ -191,7 +191,8 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
                 if (character != null) {
                     CharacterDetailEditor(
                         character = character,
-                        availableSkills = uiState.skills, // Skills list
+                        availableSkills = uiState.skills,
+                        availableLocations = uiState.locations, // Pass locations
                         onSave = { screenModel.saveCharacter(it) },
                         onDelete = { 
                             screenModel.deleteCharacter(it) 
@@ -211,11 +212,12 @@ fun CharacterEditor(screenModel: EditorScreenModel) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CharacterDetailEditor(
     character: Character,
     availableSkills: List<Skill>,
+    availableLocations: List<com.novelsim.app.data.model.Location>,
     onSave: (Character) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -291,6 +293,46 @@ fun CharacterDetailEditor(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+
+                // 所属地点选择
+                var showLocationMenu by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = showLocationMenu,
+                    onExpandedChange = { showLocationMenu = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val currentLocationName = availableLocations.find { it.id == character.locationId }?.name ?: "无 (未分配)"
+                    OutlinedTextField(
+                        value = currentLocationName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("所属地点") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showLocationMenu) },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = showLocationMenu,
+                        onDismissRequest = { showLocationMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("无 (未分配)") },
+                            onClick = {
+                                onSave(character.copy(locationId = null))
+                                showLocationMenu = false
+                            }
+                        )
+                        availableLocations.forEach { loc ->
+                            DropdownMenuItem(
+                                text = { Text(loc.name) },
+                                onClick = {
+                                    onSave(character.copy(locationId = loc.id))
+                                    showLocationMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
 
