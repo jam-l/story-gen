@@ -338,17 +338,22 @@ class StoryPlayerScreenModel(
         // 从引擎获取敌人数据
         val baseEnemy = storyEngine.getEnemy(content.enemyId) ?: return 
         
+        val story = _uiState.value.story ?: return
+        
         // 计算动态难度系数
         // 1. 玩家等级系数：确保怪物强度随玩家等级提升
         // 2. 地图深度系数：根据节点 Y 坐标判断"深度"，模拟地图分布难度
         val playerLevel = gameState.playerStats.level
-        val depthFactor = (node.position.y / 1000f).coerceAtLeast(0f) // 假设每 1000px 增加一次难度阶梯
+
+        // 计算基于地点的难度系数
+        // 不再单纯依赖 Y 坐标，而是根据地点在故事中的顺序 (index)
+        val locationIndex = story.locations.indexOfFirst { it.id == node.locationId }.coerceAtLeast(0)
         
-        // 综合难度倍率 = (1 + (玩家等级 - 1) * 0.1) + 深度系数 * 0.2
-        // 这个公式让怪物稍微比玩家强一点点，同时越深处越强
+        // 综合难度倍率 = (1 + (玩家等级 - 1) * 0.15) * (1 + (地点序数 * 0.3))
+        // 每进入下一个新区域，怪物强度提升 30%
         val levelMultiplier = 1f + (playerLevel - 1) * 0.15f
-        val depthMultiplier = 1f + depthFactor * 0.2f
-        val totalMultiplier = levelMultiplier * depthMultiplier
+        val locationMultiplier = 1f + locationIndex * 0.3f
+        val totalMultiplier = levelMultiplier * locationMultiplier
 
         // 动态生成的敌人
         val scaledEnemy = baseEnemy.copy(

@@ -361,6 +361,8 @@ private fun StoryTopBar(
     onVariable: () -> Unit,
     onMap: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     TopAppBar(
         title = { 
             currentNode?.locationId?.let { locId ->
@@ -399,8 +401,9 @@ private fun StoryTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onVariable) {
-                Icon(Icons.Default.Info, contentDescription = "变量")
+            // 高频操作：地图、状态、背包
+            IconButton(onClick = onMap) {
+                Icon(Icons.Default.Place, contentDescription = "地图", tint = MaterialTheme.colorScheme.primary)
             }
             IconButton(onClick = onStatus) {
                 Icon(Icons.Default.Person, contentDescription = "状态")
@@ -408,14 +411,42 @@ private fun StoryTopBar(
             IconButton(onClick = onInventory) {
                 Icon(Icons.Default.Favorite, contentDescription = "背包")
             }
-            IconButton(onClick = onHistory) {
-                Icon(Icons.Default.DateRange, contentDescription = "历史")
-            }
-            IconButton(onClick = onSave) {
-                Icon(Icons.Default.Done, contentDescription = "存档")
-            }
-            IconButton(onClick = onMap) {
-                Icon(Icons.Default.Place, contentDescription = "地图", tint = MaterialTheme.colorScheme.primary)
+            
+            // 次要操作：折叠在菜单中
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("剧情回顾") },
+                        onClick = { 
+                            showMenu = false
+                            onHistory() 
+                        },
+                        leadingIcon = { Icon(Icons.Default.DateRange, null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("保存进度") },
+                        onClick = { 
+                            showMenu = false
+                            onSave() 
+                        },
+                        leadingIcon = { Icon(Icons.Default.Done, null) }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("世界详情") },
+                        onClick = { 
+                            showMenu = false
+                            onVariable() 
+                        },
+                        leadingIcon = { Icon(Icons.Default.Info, null) }
+                    )
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(

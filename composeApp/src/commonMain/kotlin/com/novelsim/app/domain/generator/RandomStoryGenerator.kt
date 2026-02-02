@@ -468,16 +468,29 @@ class RandomStoryGenerator(
             nodeIds.add(node.id)
         }
 
-        // 4.5 关联地点 (根据位置距离最近判定)
-        val nodesWithLocation = nodes.mapValues { (_, node) ->
-            val nearestLocation = generatedLocations.minByOrNull { loc ->
-                val dx = node.position.x - loc.position.x
-                val dy = node.position.y - loc.position.y
-                dx * dx + dy * dy
+        // 4.5 关联地点 (顺序均匀分配)
+        // 将剧情节点按顺序均匀分配给各个地点，避免因坐标比例问题导致堆积
+        if (generatedLocations.isNotEmpty()) {
+            val sortedLocations = generatedLocations.sortedBy { it.position.y }
+            val sortedNodeIds = nodeIds.filter { 
+                val type = nodes[it]?.type 
+                type != NodeType.END // 结局节点单独处理
             }
-            node.copy(locationId = nearestLocation?.id)
+            
+            // 计算每个地点的节点容量
+            val nodesPerLocation = kotlin.math.ceil(sortedNodeIds.size.toFloat() / sortedLocations.size).toInt()
+            
+            sortedNodeIds.forEachIndexed { index, nodeId ->
+                val locationIndex = (index / nodesPerLocation).coerceAtMost(sortedLocations.lastIndex)
+                val location = sortedLocations[locationIndex]
+                nodes[nodeId] = nodes[nodeId]!!.copy(locationId = location.id)
+            }
+            
+            // 结局节点归属于最后一个地点
+            nodeIds.filter { nodes[it]?.type == NodeType.END }.forEach { id ->
+                nodes[id] = nodes[id]!!.copy(locationId = sortedLocations.last().id)
+            }
         }
-        nodes.putAll(nodesWithLocation)
 
         // 4.6 实体关联地点 (分配 NPC, 怪物, 道具到地点)
         val locationNpcMap = mutableMapOf<String, MutableList<String>>()
@@ -881,20 +894,27 @@ class RandomStoryGenerator(
         val gridCols = kotlin.math.ceil(kotlin.math.sqrt(totalLocationCount / 1.75f)).toInt().coerceAtLeast(2)
         val gridRows = kotlin.math.ceil(totalLocationCount.toFloat() / gridCols).toInt()
         
-        // 地图比例应随节点数量动态扩展
-        val totalHeight = (config.maxNodes + 2) * 280f 
-        val cellWidth = 600f / gridCols
-        val cellHeight = totalHeight / gridRows
+        // 恢复黄金排版：固定比例网格，不再随剧情节点数量无限扩展
+        val cellWidth = 800f / gridCols
+        val cellHeight = 1200f / gridRows
         
-        // 生成所有可用的格子索引 (col, row) 并随机打乱
+        // 生成所有可用的格子索引 (col, row) - 采用蛇形 (Zig-Zag) 走位
         val allSlots = mutableListOf<Pair<Int, Int>>()
         for (r in 0 until gridRows) {
-            for (c in 0 until gridCols) {
-                allSlots.add(c to r)
+            if (r % 2 == 0) {
+                // 偶数行：从左到右
+                for (c in 0 until gridCols) {
+                    allSlots.add(c to r)
+                }
+            } else {
+                // 奇数行：从右到左
+                for (c in (gridCols - 1) downTo 0) {
+                    allSlots.add(c to r)
+                }
             }
         }
-        // 使用配置的随机源打乱格子
-        val shuffledSlots = allSlots.shuffled(random).toMutableList()
+        // 顺序使用格子，确保地点连贯衔接
+        val activeSlots = allSlots.toMutableList()
         
         var generatedCount = 0
 
@@ -916,7 +936,7 @@ class RandomStoryGenerator(
                  }
                  
                 // 分配唯一格子
-                val slot = if (shuffledSlots.isNotEmpty()) shuffledSlots.removeAt(0) else (0 to 0)
+                val slot = if (activeSlots.isNotEmpty()) activeSlots.removeAt(0) else (0 to 0)
                 val col = slot.first
                 val row = slot.second
                 
@@ -1429,11 +1449,58 @@ class RandomStoryGenerator(
             }
 
             val currentNode = nodes[currentId]!!
-            val connection = Connection(nextId)
+            var finalNextId = nextId
+            
+            // 检测是否跨越地点：如果目标节点属于不同地点，则插入一个选择节点作为确认
+            val nextNode = nodes[nextId]
+            if (currentNode.locationId != null && nextNode?.locationId != null && 
+                currentNode.locationId != nextNode.locationId) {
+                
+                val currentLocName = nodes.values.find { it.locationId == currentNode.locationId }?.let { n ->
+                   // 粗略查找地点名，实际上应该存了 map
+                   // 这里简单通过 locationId 查找 Location 对象比较麻烦，
+                   // 但我们可以用通用文本 "当前区域" 和 "下一区域"
+                   "当前区域"
+                } ?: "区域"
+                
+                val transitionNodeId = "trans_${currentId}_to_${nextId}"
+                // 创建过渡选择节点
+                val transitionNode = StoryNode(
+                    id = transitionNodeId,
+                    type = NodeType.CHOICE,
+                    locationId = currentNode.locationId, // 仍属于当前区域，作为出口
+                    position = NodePosition(
+                        (currentNode.position.x + nextNode.position.x) / 2,
+                        (currentNode.position.y + nextNode.position.y) / 2
+                    ),
+                    content = NodeContent.Choice(
+                        prompt = "你即将离开$currentLocName，是否继续前进？",
+                        options = listOf(
+                            ChoiceOption(
+                                id = "opt_go_${transitionNodeId}",
+                                text = "前往下一区域",
+                                nextNodeId = nextId
+                            ),
+                            ChoiceOption(
+                                id = "opt_stay_${transitionNodeId}",
+                                text = "暂时留下 (回到本区域起点)",
+                                nextNodeId = nodes.values.filter { it.locationId == currentNode.locationId }
+                                    .minByOrNull { it.position.y }?.id ?: currentId
+                            )
+                        )
+                    ),
+                    connections = listOf(Connection(nextId), Connection(currentId))
+                )
+                
+                nodes[transitionNodeId] = transitionNode
+                finalNextId = transitionNodeId
+            }
+
+            val connection = Connection(finalNextId)
             nodes[currentId] = currentNode.copy(connections = listOf(connection))
 
             // 更新特殊节点的 nextNodeId
-            updateNodeNextId(nodes, currentId, nextId)
+            updateNodeNextId(nodes, currentId, finalNextId)
         }
 
         // 连接选择节点的选项到不同目标
