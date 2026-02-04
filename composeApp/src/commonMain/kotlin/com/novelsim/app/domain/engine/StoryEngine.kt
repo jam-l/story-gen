@@ -2,6 +2,9 @@ package com.novelsim.app.domain.engine
 
 import com.novelsim.app.data.model.*
 import com.novelsim.app.data.repository.StoryRepository
+import com.novelsim.app.domain.simulation.WorldSimulator
+import com.novelsim.app.domain.simulation.SimAction
+import com.novelsim.app.domain.simulation.InteractionRule
 import com.novelsim.app.util.PlatformUtils
 
 /**
@@ -20,6 +23,10 @@ class StoryEngine(
     private var currentGameState: GameState? = null
     private var events: Map<String, GameEvent> = emptyMap()
     private var enemies: Map<String, Enemy> = emptyMap()
+    
+    // 初始化 WorldSimulator
+    private val worldSimulator = WorldSimulator(this)
+
     
     /**
      * 加载故事并初始化游戏状态
@@ -136,8 +143,53 @@ class StoryEngine(
         )
         currentGameState = state.copy(history = state.history + historyItem)
         
+        // 特殊处理：如果 nextNodeId 是仿真动作协议
+        if (option.nextNodeId.startsWith("SIM_ACTION:")) {
+            return processSimulationAction(option.nextNodeId)
+        }
+        
         // 跳转到下一个节点
         return navigateToNode(option.nextNodeId)
+    }
+
+    /**
+     * 注册动态生成的节点到当前故事中，以防止 "Node not found" 错误
+     */
+    private fun registerDynamicNode(node: StoryNode) {
+        val story = currentStory ?: return
+        val newNodes = story.nodes.toMutableMap()
+        newNodes[node.id] = node
+        currentStory = story.copy(nodes = newNodes)
+    }
+
+    /**
+     * 处理仿真动作
+     * format: SIM_ACTION:targetId:ruleId
+     */
+    private fun processSimulationAction(actionStr: String): Result<StoryNode> {
+        val parts = actionStr.split(":")
+        if (parts.size < 3) return Result.failure(Exception("Invalid action format"))
+        
+        val targetId = parts[1]
+        val ruleId = parts[2]
+        
+        // 为了安全起见，我们重新获取 Actions 来匹配 Rule
+        val action = worldSimulator.getSimAction(targetId, ruleId)
+        
+        return if (action != null) {
+            val resultNode = worldSimulator.executeInteraction(action)
+            
+            // 重要：注册节点到故事中
+            registerDynamicNode(resultNode)
+            
+            // 更新当前节点状态
+             currentGameState = currentGameState?.copy(
+                currentNodeId = resultNode.id
+            )
+            Result.success(resultNode)
+        } else {
+             Result.failure(Exception("Action no longer available"))
+        }
     }
     
     /**
@@ -148,7 +200,16 @@ class StoryEngine(
             ?: return Result.failure(Exception("当前节点不存在"))
         
         val nextNodeId = currentNode.connections.firstOrNull()?.targetNodeId
-            ?: return Result.failure(Exception("没有下一个节点"))
+        
+        if (nextNodeId == null) {
+             // 如果没有静态连接，尝试进入仿真模式
+             // 或者如果节点内容显示 nextNodeId 是特定的 "SIMULATOR_NEXT"
+             val contentNext = (currentNode.content as? NodeContent.Dialogue)?.nextNodeId
+             if (contentNext == "SIMULATOR_NEXT" || contentNext?.endsWith("_next") == true) { // Hack based on WS impl
+                 return Result.success(worldSimulator.generateChoiceNode())
+             }
+             return Result.failure(Exception("没有下一个节点"))
+        }
         
         return navigateToNode(nextNodeId)
     }
@@ -160,6 +221,29 @@ class StoryEngine(
         val story = currentStory
             ?: return Result.failure(Exception("未加载故事"))
         
+        // 特殊处理：仿真模式入口
+        if (nodeId == "SIMULATOR_NEXT" || nodeId.endsWith("_next")) {
+             println("DEBUG: Entering SIMULATOR_NEXT logic")
+             try {
+                 val node = worldSimulator.generateChoiceNode()
+                 println("DEBUG: Generated choice node: ${node.id} with options: ${(node.content as? NodeContent.Choice)?.options?.size}")
+                 
+                 // 重要：注册节点到故事中
+                 registerDynamicNode(node)
+                 
+                 // 更新当前节点状态，确保下次 continueDialogue 能找到它
+                  currentGameState = currentGameState?.copy(
+                    currentNodeId = node.id
+                )
+                 
+                 return Result.success(node)
+             } catch (e: Exception) {
+                 println("DEBUG: Error generating choice node: ${e.message}")
+                 e.printStackTrace()
+                 return Result.failure(e)
+             }
+        }
+
         val nextNode = story.nodes[nodeId]
             ?: return Result.failure(Exception("节点不存在: $nodeId"))
         

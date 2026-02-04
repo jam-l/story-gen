@@ -103,7 +103,10 @@ class RandomStoryGenerator(
         val characterMinMp: Int = 20,
         val characterMaxMp: Int = 100,
         val characterMinLuck: Int = 0,
-        val characterMaxLuck: Int = 10
+        val characterMaxLuck: Int = 10,
+
+        /** 是否为纯仿真模式 (完全由交互驱动，无预设剧情图) */
+        val isPureSimulation: Boolean = true
     )
 
     /**
@@ -372,7 +375,7 @@ class RandomStoryGenerator(
         
         // 0. 生成核心元素 (道具、变量、敌人、角色、地点、阵营)
         val generatedItems = generateRandomItems()
-        val generatedVariables = generateRandomVariables()
+        val generatedVariables = generateRandomVariables().toMutableMap()
         // 敌人通常随后续节点生成，并按强度排序以支持难度曲线
         val preGeneratedEnemies = generateRandomEnemies().sortedBy { 
             it.stats.maxHp + it.stats.attack * 4 + it.stats.defense * 2 
@@ -528,7 +531,42 @@ class RandomStoryGenerator(
         }
         
         // 5. 连接节点
-        connectNodes(nodes, nodeIds)
+        if (config.isPureSimulation) {
+            // 纯仿真模式：仅创建一个起始节点，直接连接到仿真循环
+            // 覆盖之前的生成逻辑 (或者我们可以保留生成的实体，但丢弃生成的剧情节点)
+            
+            // 清理生成的剧情节点，只保留 Start
+            nodes.clear()
+            nodeIds.clear()
+            
+            val introText = "你来到了一个陌生的世界。[纯仿真模式]" +
+                    (if (generatedLocations.isNotEmpty()) "\n你目前身处：${generatedLocations.first().name}。" else "") +
+                    "\n这里的一切都由你决定。"
+            
+            val startNode = StoryNode(
+                id = "start",
+                type = NodeType.DIALOGUE,
+                content = NodeContent.Dialogue(
+                    text = introText,
+                    speaker = "旁白",
+                    nextNodeId = "SIMULATOR_NEXT"
+                ),
+                locationId = generatedLocations.firstOrNull()?.id,
+                position = NodePosition(400f, 300f),
+                connections = listOf(Connection("SIMULATOR_NEXT"))
+            )
+            
+            nodes[startNode.id] = startNode
+            nodeIds.add(startNode.id)
+            
+            // 确保主角有位置
+            if (generatedLocations.isNotEmpty()) {
+                generatedVariables["current_location"] = generatedLocations.first().id
+            }
+            
+        } else {
+            connectNodes(nodes, nodeIds)
+        }
         
         return Story(
             id = "story_${PlatformUtils.getCurrentTimeMillis()}",
@@ -615,6 +653,13 @@ class RandomStoryGenerator(
         actualRule.customStats.forEach { statConfig ->
             variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
         }
+        
+        // 仿真系统初始化
+        // 随机给予一些状态
+        if (random.nextFloat() < 0.3f) {
+            variables["mood"] = listOf("happy", "angry", "sad").random(random)
+        }
+        variables["is_busy"] = "false"
 
         return Character(
             id = id,
@@ -713,6 +758,16 @@ class RandomStoryGenerator(
         val variables = mutableMapOf<String, String>()
         actualRule.customStats.forEach { statConfig ->
             variables[statConfig.name] = random.nextInt(statConfig.min, statConfig.max + 1).toString()
+        }
+        
+        // 仿真系统初始化
+        variables["isOwned"] = "false"
+        if (type == ItemType.EQUIPMENT) {
+            variables["isEquipped"] = "false"
+            // 随机添加状态：比如"生锈"
+            if (random.nextFloat() < 0.2f) {
+                variables["condition"] = "rusty" // 生锈的，可能这会影响效果
+            }
         }
 
         return Item(
@@ -1526,16 +1581,26 @@ class RandomStoryGenerator(
                         index == 0 && endingNodes.isNotEmpty() -> endingNodes.first()
                         (dialogueNodes.size / 2 + index) < dialogueNodes.size -> dialogueNodes[dialogueNodes.size / 2 + index]
                         endingNodes.isNotEmpty() -> endingNodes[index % endingNodes.size]
-                        else -> dialogueNodes.lastOrNull() ?: "start"
+                        else -> "SIMULATOR_NEXT" // 进入自由模式而不是回到起点
                     }
                 }
                 option.copy(nextNodeId = targetId)
             }
             
-            val newConnections = updatedOptions.map { Connection(it.nextNodeId) }
+            // 偶尔添加自由探索选项
+            var finalOptions = updatedOptions
+            if (random.nextFloat() < 0.2f && endingNodes.isEmpty()) { // 20% 概率在无限模式下添加自由探索
+                 finalOptions = updatedOptions + ChoiceOption(
+                     id = "opt_sim_${choiceId}",
+                     text = "自由探索",
+                     nextNodeId = "SIMULATOR_NEXT" 
+                 )
+            }
+            
+            val newConnections = finalOptions.map { Connection(it.nextNodeId) }
             
             nodes[choiceId] = choiceNode.copy(
-                content = choice.copy(options = updatedOptions),
+                content = choice.copy(options = finalOptions),
                 connections = newConnections
             )
         }
@@ -1549,8 +1614,8 @@ class RandomStoryGenerator(
                 val targetId = if (endingNodes.isNotEmpty()) {
                     endingNodes.first()
                 } else {
-                    // 无限模式：连接回到中间某个节点形成大循环
-                    if (dialogueNodes.size > 2) dialogueNodes[dialogueNodes.size / 2] else "start"
+                    // 无限模式：进入仿真循环
+                    "SIMULATOR_NEXT"
                 }
                 nodes[lastDialogueId] = lastNode.copy(connections = listOf(Connection(targetId)))
                 updateNodeNextId(nodes, lastDialogueId, targetId)

@@ -302,12 +302,17 @@ class StoryPlayerScreenModel(
      * 跳转到下一个节点
      */
     private fun continueToNextNode() {
+        println("DEBUG: continueToNextNode called")
         screenModelScope.launch {
             storyEngine.continueDialogue().fold(
                 onSuccess = { node ->
+                    println("DEBUG: continueDialogue success: ${node.id} type=${node.type}")
                     processNode(node)
                 },
-                onFailure = { /* 没有下一个节点，可能需要用户选择 */ }
+                onFailure = { e -> 
+                    println("DEBUG: continueDialogue failed: ${e.message}")
+                    e.printStackTrace()
+                }
             )
         }
     }
